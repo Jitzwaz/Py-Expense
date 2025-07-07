@@ -1,0 +1,10 @@
+{
+  "categories": {
+    "food": {
+      "burger": {
+        "Amount": 12,
+        "Date": "10/12/25"
+      }
+    }
+  }
+}
