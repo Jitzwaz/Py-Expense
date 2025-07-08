@@ -1,0 +1,18 @@
+{
+  "categories": {
+    "food": {
+      "burger": {
+        "Amount": 12.0,
+        "Date": "10/12/25"
+      },
+      "fries": {
+        "Amount": 4.0,
+        "Date": "10/11/25"
+      },
+      "test1": {
+        "Amount": 100.0,
+        "Date": "7/7/2025"
+      }
+    }
+  }
+}
