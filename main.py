@@ -38,32 +38,46 @@ maxRetries = 2
 
 # functions
 
-def saveToFile(file, data):
-	with open(file, mode='w', encoding='utf-8') as f:
-		json.dump(data, f, indent=2)
-
-def loadFromFile(file):
-	with open(file, mode='r', encoding='utf-8') as f:
-		data = json.load(f)
-		return data
-
 def funcErrorOutput(errortype, rawError, comments='No comments provided'):
 	tbList = traceback.extract_tb(rawError.__traceback__)
 	fName, lineNum, funcName, text = tbList[-1]
 	print('\n') # newline for clarity
 	print(f'[bold red]{inspect.currentframe().f_back.f_code.co_name} {errortype}[/bold red]\n  Passed comments: {comments}\n  Line: {lineNum}\n  Raw error: {rawError}')
 
-def checkCatPresense(data, category, attempts):
+def saveToFile(file, data): # Add error handling
+	with open(file, mode='w', encoding='utf-8') as f:
+		json.dump(data, f, indent=2)
+
+def loadFromFile(file): # Add error handling
+	with open(file, mode='r', encoding='utf-8') as f:
+		data = json.load(f)
+		return data
+
+def checkCatPresense(data, category, rePrompt=True):
 	if category in data['categories'].keys():
-		change = input(f'A category matching the name provided ({category}) already exists in the current file. Would you like to enter a different name? y/n\n')
-		if change in validAgrees:
-			category = input('Name of category: ')
-			return category
+		if rePrompt == True:
+			change = input(f'A category matching the name provided ({category}) already exists in the current file. Would you like to enter a different name? y/n\n')
+			if change in validAgrees:
+				category = input('Name of category: ')
+				return category
+			else:
+				return False
+		elif rePrompt == False:
+			return False
+	elif category not in data['categories'].keys():
+		if rePrompt == False:
+			return True
+		elif rePrompt == True:
+			change = input(f'A category matching the name provided ({category}) could not be found in the current file. Would you like to ender a different name? y/n\n')
+			if change in validAgrees:
+				category = input('Name of category: ')
+				return category
+
 
 
 # commands
 
-def addExpense(file):
+def addExpense(file): # add error handling
 	
 	stuffNotFound = [] # hold list of what wasn't correct so i can use a for loop and look super cool
 
@@ -80,7 +94,7 @@ def addExpense(file):
 	# formatting
 	try:
 		expenseVal = float(expenseVal)
-	except ValueError as ve:
+	except ValueError as ve: # add general exception clause
 		funcErrorOutput('ValueError', ve, f'Error during conversion of expenseVal to float, expenseVal: {expenseVal}')
 		print('Aborting command due to error.')
 		return
@@ -90,11 +104,11 @@ def addExpense(file):
 
 	# invalid input error handling when i get around to it
 	
-	dataFromFile['categories'][expenseCat][expenseName] = {'Amount' : expenseVal, 'Date': expenseDate}
+	dataFromFile['categories'][expenseCat][expenseName] = {'Amount' : expenseVal, 'Date': expenseDate} # throw in try/except and add error handling
 	saveToFile(file, dataFromFile)
 	print('Expense added to file.')
 
-def removeExpense(file):
+def removeExpense(file): # add error handling
 	expenseName = input('Name of expense: ')
 	expenseCat = input('Category of expense: ')
 	cOrD = input('Cost or date of expense: ')
@@ -174,10 +188,10 @@ def removeExpense(file):
 						dataFromFile['categories'][expenseCat].pop(expenseName)
 						saveToFile(file, dataFromFile)
 						print('Expense removed from file.')
-	except Exception as e:
+	except Exception as e: # add more specific errors
 		funcErrorOutput('General exception', e, 'general fault for trying to delete expense after passing checkExpensePresense')
 
-def addCategory(file):
+def addCategory(file): # add error handling
 	category = input('Name of the category to add: ')
 
 	data = loadFromFile(file)
@@ -186,11 +200,54 @@ def addCategory(file):
 	timesChecked = 0
 
 	while timesChecked <= maxRetries:
-		pass
+		timesChecked+=1
+		out = checkCatPresense(data, category)
+		if out == True:
+			break
+		elif out == False:
+			print('Aborting command')
+			return
+		else:
+			category = out
+		if timesChecked == maxRetries:
+			print(f'Aborting command due to invalid category input.')
+			return
+	data['categories'][category] = {}
+	saveToFile(file, data)
+	print('Category added successfully.')
 
+def removeCategory(file): # add error handling
+	category = input('Name of the category to remove: ')
+
+	data = loadFromFile(file)
+
+	# input validation and checking
+	timesChecked = 0
+
+	while timesChecked <= maxRetries:
+		timesChecked+=1
+		out = checkCatPresense(data, category)
+		print(f'out: {out}')
+		if out == False:
+			break
+		elif out == True:
+			print('Aborting command')
+			return
+		else:
+			category = out
+		if timesChecked == maxRetries:
+			print(f'Aborting command due to invalid category input.')
+			return
+	
+	choice = input(f'Are you sure you want to delete {category}? y/n\n')
+
+	if choice in validAgrees:
+		data['categories'].pop(category) # add try/except wrapper
+		saveToFile(file, data)
+		print('Category removed successfully.')
 
 # testing
 #os.path.join(expenseFilesDir, 'test.json')
-addExpense(os.path.join(expenseFilesDir, 'test.json'))
+removeCategory(os.path.join(expenseFilesDir, 'test.json'))
 
-# main
+# main program loop
