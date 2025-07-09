@@ -303,6 +303,7 @@ settingsTemplate = {
 	'settings': {
 		'reportDir': expenseFilesDir,
 		'reportIndent': 2,
+		'encoding': 'utf-8',
 		'commands': {
 			#read in commands from commandsDict ig for defaults, maybe add custom command support?
 		},
@@ -331,9 +332,30 @@ def readSettings(name, dir):
 			size = os.path.getsize(filePres[1])
 			fileEmpty = 'The file is empty'
 			backup = 'The file may have syntax errors inside.'
-			funcErrorOutput('JSON Decode Error', jde, f'Error when attempting to parse settings.json file. {fileEmpty if size==0 else backup}, creating new settings file from defaults.') # add a check for the file being empty
+			funcErrorOutput('JSON Decode Error', jde, f'Error when attempting to parse settings.json file. {fileEmpty if size==0 else backup}, creating new settings file from defaults.')
+			choice = input('Would you like to save the current settings file for manual review? y/n\n')
+			if choice in validAgrees:
+				try:
+					os.rename(filePres[1], 'settingsOld.json')
+				except PermissionError as pe:
+					funcErrorOutput('PermissionError', pe, f'Permission error when attempting to rename settings file in path {os.path.join(dir,name)}')
+				
+				#create new file
+				try:
+					with open(os.path.join(dir, name), 'w+', encoding=settingsTemplate['settings']['encoding']) as file:
+						saveToFile(file, settingsTemplate)
+				except PermissionError as pe:
+					funcErrorOutput('PermissionError', pe, f'Permission error when attempting to create new settings file in path {os.path.join(dir, name)}')
+
 	elif filePres[0] == False:
-		console.print(f'[warn]File Not Found (no exception)[/warn]\nNo file was found, [info]file name provided: {filePres[1]} path provided: {filePres[2]}[/info]')
+		console.print(f'[warn]WARNING: File Not Found[/warn]\nNo file was found, [info]file name provided: {filePres[1]} path provided: {filePres[2]}[/info]')
+		choice = input('Would you like to create a new settings file from the default settings? y/n\n')
+		if choice in validAgrees:
+			try:
+				with open(os.path.join(dir, name), 'w+', encoding=settingsTemplate['settings']['encoding']) as file:
+					saveToFile(file, settingsTemplate)
+			except PermissionError as pe:
+				funcErrorOutput('PermissionError', pe, f'Permission error when attempting to create new settings file in path {os.path.join(dir, name)}')
 
 currentSettings = readSettings('settings.json', parentDir)
 
