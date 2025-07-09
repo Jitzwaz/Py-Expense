@@ -3,6 +3,7 @@ from datetime import date, time, datetime
 import myUtils
 import os
 import inspect
+import traceback
 
 # just for data structure reference
 # template = {
@@ -40,8 +41,11 @@ def loadFromFile(file):
 		data = json.load(f)
 		return data
 
-def funcErrorOutput(errortype, rawError):
-	print(f'{inspect.currentframe().f_back.f_code.co_name} {errortype} when attempting to convert expenseVal to float. \n Raw error: \n {rawError}')
+def funcErrorOutput(errortype, rawError, comments='No comments provided'):
+	tbList = traceback.extract_tb(rawError.__traceback__)
+	fName, lineNum, funcName, text = tbList[-1]
+	print('\n') # newline for clarity
+	print(f'{inspect.currentframe().f_back.f_code.co_name} {errortype}\nPassed comments: {comments}\nLine: {lineNum}\nRaw error:\n{rawError}')
 
 
 # commands
@@ -52,6 +56,8 @@ maxRetries = 2
 
 def addExpense(file):
 	
+	stuffNotFound = [] # hold list of what wasn't correct so i can use a for loop and look super cool
+
 	#args
 	expenseName = input('Name of expense: ')
 	expenseCat = input('Category of expense: ')
@@ -61,42 +67,20 @@ def addExpense(file):
 	else:
 		currDate = datetime.now()
 		expenseDate = f'{currDate.month}/{currDate.day}/{currDate.year}'
-	# add value checks and error catching
 
 	# formatting
 	try:
 		expenseVal = float(expenseVal)
-	except TypeError as te:
-		funcErrorOutput('TypeError', te)
+	except ValueError as ve:
+		funcErrorOutput('ValueError', ve)
+		print('Aborting command due to error.')
+		return
 
 	dataFromFile = loadFromFile(file)
 	print(f'datafromfile:{dataFromFile}')
-	# value checking/invalid input handling
-	timesChecked = 0
 
-	def checkExpensePresense(): # make more universal
-		nonlocal expenseName
-		nonlocal expenseCat
-		nonlocal expenseVal
-		nonlocal expenseDate
-		nonlocal timesChecked
-		if timesChecked >= maxRetries:
-			print('You have reached the maximum number of allowed retries.')
-			return
-		
-		timesChecked += 1
-		if expenseCat in dataFromFile['categories']:
-			if expenseName in dataFromFile['categories'][expenseCat].keys():
-				if expenseDate in dataFromFile['categories'][expenseCat][expenseName].values():
-					change = input(f'The expense you are trying to log ({expenseName}) has already been logged, would you like to change the name? \n')
-					if change in validAgrees:
-						expenseName = input('Name of expense: ')
-						checkExpensePresense()
-					else:
-						print('Aborting command.')
-						return
-	checkExpensePresense()
-
+	# invalid input error handling when i get around to it
+	
 	dataFromFile['categories'][expenseCat][expenseName] = {'Amount' : expenseVal, 'Date': expenseDate}
 	saveToFile(file, dataFromFile)
 	print('Expense added to file.')
@@ -122,7 +106,7 @@ def removeExpense(file):
 	# input validation
 	timesChecked = 0
 
-	def checkExpensePresense(): # make more universal
+	def checkExpensePresense(operation): # make more universal and reusable
 		nonlocal expenseName
 		nonlocal expenseCat
 		nonlocal expenseVal
@@ -135,28 +119,58 @@ def removeExpense(file):
 		timesChecked += 1
 		if expenseCat in dataFromFile['categories']:
 			if expenseName in dataFromFile['categories'][expenseCat].keys():
-				if expenseDate not in dataFromFile['categories'][expenseCat][expenseName].values():
-					change = input(f'The expense you are trying to remove ({expenseName}) has not been found, would you like to change the name? \n')
+				if expenseDate not in dataFromFile['categories'][expenseCat][expenseName]['Date']:
+					change = input(f'The expense you are trying to {operation} ({expenseName}) could not be found with a matching date, would you like to change the date? y/n\n')
 					if change in validAgrees:
-						expenseName = input('Name of expense: ')
-						checkExpensePresense()
+						expenseDate = input('Date of expense: ')
+						checkExpensePresense(operation)
 					else:
 						print('Aborting command.')
-						return
-	checkExpensePresense()
+						return False
+				elif expenseVal not in dataFromFile['categories'][expenseCat][expenseName]['Amount']:
+					change = input(f'The expense you are trying to {operation} ({expenseName}) could not be found with a matching amount, would you like to change the amount? y/n\n')
+					if change in validAgrees:
+						expenseVal = input('Amount of expense: ')
+						checkExpensePresense(operation)
+					else:
+						print('Aborting command.')
+						return False
+			elif expenseName not in dataFromFile['categories'][expenseCat].keys():
+				change = input(f'The expense you are trying to {operation} ({expenseName}) has not been found by, would you like to change the name? y/n\n')
+				if change in validAgrees:
+					expenseName = input('Name of expense: ')
+					checkExpensePresense(operation)
+				else:
+					print('Aborting command.')
+					return False
+
+	if checkExpensePresense('remove') == False:
+		return
 
 	# find and remove expense
 	try:
 		expense = dataFromFile['categories'][expenseCat][expenseName]
 		if expense != None:
 			if expenseDate != None:
-				if expense['Date']
+				if expense['Date'] == expenseDate:
+					yn = input(f'Are you sure you want to delete the following expense?\nName: {expenseName}\nCategory: {expenseCat}\nAmount: {expense['Amount']}\nDate: {expenseDate}\n y/n?')
+					if yn in validAgrees:
+						dataFromFile['categories'][expenseCat].pop(expenseName)
+						saveToFile(file, dataFromFile)
+						print('Expense removed from file.')
+			elif expenseVal != None:
+				if expense['Amount'] == expenseVal:
+					yn = input(f'Are you sure you want to delete the following expense?\nName: {expenseName}\nCategory: {expenseCat}\nAmount: {expense['Amount']}\nDate: {expense['Date']}\n y/n?')
+					if yn in validAgrees:
+						dataFromFile['categories'][expenseCat].pop(expenseName)
+						saveToFile(file, dataFromFile)
+						print('Expense removed from file.')
 	except Exception as e:
-		funcErrorOutput('General exception', e)
+		funcErrorOutput('General exception', e, 'general fault for trying to delete expense after passing checkExpensePresense')
 
 
 # testing
 #os.path.join(expenseFilesDir, 'test.json')
-removeExpense(os.path.join(expenseFilesDir, 'test.json'))
+addExpense(os.path.join(expenseFilesDir, 'test.json'))
 
 # main
