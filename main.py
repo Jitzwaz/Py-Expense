@@ -1,9 +1,13 @@
 import json
 from datetime import date, time, datetime
-import myUtils
+#import myUtils
 import os
 import inspect
 import traceback
+
+#rich imports
+from rich import print
+from rich.columns import Columns
 
 # just for data structure reference
 # template = {
@@ -17,7 +21,7 @@ import traceback
 # 	}
 # }
 
-# vars
+# global vars, make settings file at some point - json maybe
 
 currentFilePath = os.path.join(os.path.abspath(__file__), 'reports')
 currentDir = os.path.dirname(currentFilePath)
@@ -29,6 +33,8 @@ commandsDict = {
 }
 
 validAgrees = ['y', 'yes']
+
+maxRetries = 2
 
 # functions
 
@@ -45,14 +51,17 @@ def funcErrorOutput(errortype, rawError, comments='No comments provided'):
 	tbList = traceback.extract_tb(rawError.__traceback__)
 	fName, lineNum, funcName, text = tbList[-1]
 	print('\n') # newline for clarity
-	print(f'{inspect.currentframe().f_back.f_code.co_name} {errortype}\nPassed comments: {comments}\nLine: {lineNum}\nRaw error:\n{rawError}')
+	print(f'[bold red]{inspect.currentframe().f_back.f_code.co_name} {errortype}[/bold red]\n  Passed comments: {comments}\n  Line: {lineNum}\n  Raw error: {rawError}')
+
+def checkCatPresense(data, category, attempts):
+	if category in data['categories'].keys():
+		change = input(f'A category matching the name provided ({category}) already exists in the current file. Would you like to enter a different name? y/n\n')
+		if change in validAgrees:
+			category = input('Name of category: ')
+			return category
 
 
 # commands
-
-# global command settings
-
-maxRetries = 2
 
 def addExpense(file):
 	
@@ -72,7 +81,7 @@ def addExpense(file):
 	try:
 		expenseVal = float(expenseVal)
 	except ValueError as ve:
-		funcErrorOutput('ValueError', ve)
+		funcErrorOutput('ValueError', ve, f'Error during conversion of expenseVal to float, expenseVal: {expenseVal}')
 		print('Aborting command due to error.')
 		return
 
@@ -167,6 +176,17 @@ def removeExpense(file):
 						print('Expense removed from file.')
 	except Exception as e:
 		funcErrorOutput('General exception', e, 'general fault for trying to delete expense after passing checkExpensePresense')
+
+def addCategory(file):
+	category = input('Name of the category to add: ')
+
+	data = loadFromFile(file)
+
+	# input validation and checking
+	timesChecked = 0
+
+	while timesChecked <= maxRetries:
+		pass
 
 
 # testing
