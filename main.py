@@ -6,8 +6,19 @@ import inspect
 import traceback
 
 #rich imports
-from rich import print
+import rich
+from rich import print, align
 from rich.columns import Columns
+from rich.console import Console
+from rich.theme import Theme
+
+theme = Theme({
+    "info": "dim cyan",
+    "warning": "yellow",
+    "error": "bold red"
+})
+
+console = Console(theme=theme)
 
 # just for data structure reference
 # template = {
@@ -28,10 +39,6 @@ currentDir = os.path.dirname(currentFilePath)
 parentDir = os.path.dirname(currentDir)
 expenseFilesDir = os.path.join(parentDir, 'reports')
 
-commandsDict = {
-
-}
-
 validAgrees = ['y', 'yes']
 
 maxRetries = 2
@@ -42,7 +49,7 @@ def funcErrorOutput(errortype, rawError, comments='No comments provided'):
 	tbList = traceback.extract_tb(rawError.__traceback__)
 	fName, lineNum, funcName, text = tbList[-1]
 	print('\n') # newline for clarity
-	print(f'[bold red]{inspect.currentframe().f_back.f_code.co_name} {errortype}[/bold red]\n  Passed comments: {comments}\n  Line: {lineNum}\n  Raw error: {rawError}')
+	print(f'[error]{inspect.currentframe().f_back.f_code.co_name} {errortype}[/error]\n  Passed comments: {comments}\n  Line: {lineNum}\n  Raw error: {rawError}')
 
 def saveToFile(file, data): # Add error handling
 	with open(file, mode='w', encoding='utf-8') as f:
@@ -61,19 +68,29 @@ def checkCatPresense(data, category, rePrompt=True):
 				category = input('Name of category: ')
 				return category
 			else:
-				return False
-		elif rePrompt == False:
-			return False
+				return True
+		elif rePrompt == True:
+			return True
 	elif category not in data['categories'].keys():
 		if rePrompt == False:
-			return True
-		elif rePrompt == True:
+			return False
+		elif rePrompt == False:
 			change = input(f'A category matching the name provided ({category}) could not be found in the current file. Would you like to ender a different name? y/n\n')
 			if change in validAgrees:
 				category = input('Name of category: ')
 				return category
 
+#menus
 
+def mainMenu():
+	print(align.Align('[white bold]Main Menu[/white bold]', align='center'))
+	print('1. Open file')
+	print('2. Settings')
+	print('3. Help')
+	print('4. Exit')
+
+def settingsMenu(file):
+	
 
 # commands
 
@@ -228,13 +245,14 @@ def removeCategory(file): # add error handling
 		timesChecked+=1
 		out = checkCatPresense(data, category)
 		print(f'out: {out}')
-		if out == False:
+		if out == True:
 			break
-		elif out == True:
+		elif out == False:
 			print('Aborting command')
 			return
 		else:
 			category = out
+
 		if timesChecked == maxRetries:
 			print(f'Aborting command due to invalid category input.')
 			return
@@ -246,8 +264,37 @@ def removeCategory(file): # add error handling
 		saveToFile(file, data)
 		print('Category removed successfully.')
 
+# command mapping
+commandsDict = {
+	('addexpense', 'add expense', 'add-expense', 'add_expense', 'ae') : addExpense
+}
+
+mainOpsDict = {
+	('openfile', 'open file', 'open_file', 'open-file', 'of', '1') : None # fix when function made
+}
+
+#main global vars
+inMainMenu = False
+currentFile = None
+
 # testing
 #os.path.join(expenseFilesDir, 'test.json')
-removeCategory(os.path.join(expenseFilesDir, 'test.json'))
+#removeCategory(os.path.join(expenseFilesDir, 'test.json'))
 
 # main program loop
+def main():
+	mainMenu()
+	inMainMenu = True
+	chosenOperation = input()
+	for key in mainOpsDict.keys():
+		if chosenOperation.lower == key():
+
+if __name__ == '__main__':
+		while True:
+			try:
+				main()
+			except KeyboardInterrupt:
+				print('Returning to main menu.')
+			except Exception as e:
+				funcErrorOutput('General exception', e, 'General exception catch in main loop.')
+
