@@ -13,8 +13,8 @@ from rich.console import Console
 from rich.theme import Theme
 
 theme = Theme({
-    "info": "dim cyan",
-    "warning": "yellow",
+    "info": "cyan",
+    "warn": "yellow",
     "error": "bold red"
 })
 
@@ -45,11 +45,18 @@ maxRetries = 2
 
 # functions
 
-def funcErrorOutput(errortype, rawError, comments='No comments provided'):
+def funcErrorOutput(errortype, rawError, comments='No comments provided.'):
 	tbList = traceback.extract_tb(rawError.__traceback__)
 	fName, lineNum, funcName, text = tbList[-1]
 	print('\n') # newline for clarity
-	print(f'[error]{inspect.currentframe().f_back.f_code.co_name} {errortype}[/error]\n  Passed comments: {comments}\n  Line: {lineNum}\n  Raw error: {rawError}')
+	console.print(f'[error]{inspect.currentframe().f_back.f_code.co_name}: {errortype}[/error]\n  Passed comments: {comments}\n  Line: {lineNum}\n  Raw error: {rawError}')
+
+def funcWarnOutput(warnType, rawWarn=None, comments='No comments provided.'):
+	if rawWarn != None:
+		tbList = traceback.extract_tb(rawWarn.__traceback__)
+		fName, lineNum, funcName, text = tbList[-1]
+	print('\n') # newline for clarity
+	console.print(f'[warn]{inspect.currentframe().f_back.f_code.co_name}: {warnType}[/warn]\n  Passed comments: {comments}\n  Line: {lineNum if rawWarn != None else 'N/A'}\n  Raw error: {rawWarn if rawWarn != None else 'N/A'}')
 
 def saveToFile(file, data): # Add error handling
 	with open(file, mode='w', encoding='utf-8') as f:
@@ -80,7 +87,24 @@ def checkCatPresense(data, category, rePrompt=True):
 				category = input('Name of category: ')
 				return category
 
-#menus
+def checkForFile(file, path):
+	try:
+		for (root, dirs, files) in os.walk(path, topdown=True):
+			if file in files:
+				return True, os.path.join(root, file)
+	except Exception as e:
+		pass
+	return False, file, path
+
+def getFileCharCount(path):
+	try:
+		with open(path, 'r') as file:
+			content = file.read()
+			return len(content)
+	except Exception as e:
+		pass
+
+# menus
 
 def mainMenu():
 	print(align.Align('[white bold]Main Menu[/white bold]', align='center'))
@@ -90,7 +114,7 @@ def mainMenu():
 	print('4. Exit')
 
 def settingsMenu(file):
-	
+	pass
 
 # commands
 
@@ -273,6 +297,47 @@ mainOpsDict = {
 	('openfile', 'open file', 'open_file', 'open-file', 'of', '1') : None # fix when function made
 }
 
+# settings
+
+settingsTemplate = {
+	'settings': {
+		'reportDir': expenseFilesDir,
+		'reportIndent': 2,
+		'commands': {
+			#read in commands from commandsDict ig for defaults, maybe add custom command support?
+		},
+		'styles':{
+			"info": "dim cyan",
+		    "warning": "yellow",
+		    "error": "bold red"
+		}
+	}
+}
+
+currentSettings = None
+
+def readSettings(name, dir):
+	# add input validation for name and director
+	
+	filePres = checkForFile(name, dir)
+	if filePres[0] == True:
+		try:
+			if getFileCharCount(filePres[1]) <= 2:
+				funcWarnOutput('File does not meet minimum length requirements', rawWarn=None, comments='settings file character count was less than the minimum required characters for proper syntax.')
+				return None
+			data =  loadFromFile(filePres[1])
+			return data
+		except json.decoder.JSONDecodeError as jde:
+			size = os.path.getsize(filePres[1])
+			fileEmpty = 'The file is empty'
+			backup = 'The file may have syntax errors inside.'
+			funcErrorOutput('JSON Decode Error', jde, f'Error when attempting to parse settings.json file. {fileEmpty if size==0 else backup}, creating new settings file from defaults.') # add a check for the file being empty
+	elif filePres[0] == False:
+		console.print(f'[warn]File Not Found (no exception)[/warn]\nNo file was found, [info]file name provided: {filePres[1]} path provided: {filePres[2]}[/info]')
+
+currentSettings = readSettings('settings.json', parentDir)
+
+
 #main global vars
 inMainMenu = False
 currentFile = None
@@ -282,19 +347,17 @@ currentFile = None
 #removeCategory(os.path.join(expenseFilesDir, 'test.json'))
 
 # main program loop
-def main():
+""" def main():
 	mainMenu()
 	inMainMenu = True
 	chosenOperation = input()
 	for key in mainOpsDict.keys():
 		if chosenOperation.lower == key():
-
+			pass
 if __name__ == '__main__':
 		while True:
 			try:
 				main()
 			except KeyboardInterrupt:
 				print('Returning to main menu.')
-			except Exception as e:
-				funcErrorOutput('General exception', e, 'General exception catch in main loop.')
-
+			except Exception as e: """
