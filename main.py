@@ -46,23 +46,80 @@ maxRetries = 2
 # functions
 
 def funcErrorOutput(errortype, rawError, comments='No comments provided.'):
+	'''
+	Prints an error with the name of the function that called it, the type of error, 
+	the raw error information, the line it occured on, and any passed comments.	
+
+	Inputs:
+		errortype: string containing the name of the error
+		rawError: the exception (exception as e)
+		comments: Optional but a string that is provided
+	
+	Actions performed:
+		Console print
+	
+	Returns:
+		None
+	'''
 	tbList = traceback.extract_tb(rawError.__traceback__)
 	fName, lineNum, funcName, text = tbList[-1]
 	print('\n') # newline for clarity
 	console.print(f'[error]{inspect.currentframe().f_back.f_code.co_name}: {errortype}[/error]\n  Passed comments: {comments}\n  Line: {lineNum}\n  Raw error: {rawError}')
 
 def funcWarnOutput(warnType, rawWarn=None, comments='No comments provided.'):
+	'''
+	Actions performed a warning with the name of the function that called it, the type of warning, 
+	the raw exception information, the line it occured on, and any passed comments.	
+
+	Inputs:
+		warnType: string containing the name of the warning
+		rawWarn: the exception (exception as e) (OPTIONAL)
+		comments: Optional but a string that is provided
+	
+	Actions performed:
+		Console print
+	
+	Returns:
+		None
+	'''
 	if rawWarn != None:
 		tbList = traceback.extract_tb(rawWarn.__traceback__)
 		fName, lineNum, funcName, text = tbList[-1]
 	print('\n') # newline for clarity
 	console.print(f'[warn]{inspect.currentframe().f_back.f_code.co_name}: {warnType}[/warn]\n  Passed comments: {comments}\n  Line: {lineNum if rawWarn != None else 'N/A'}\n  Raw error: {rawWarn if rawWarn != None else 'N/A'}')
 
+# make some kind of standardization to determine whats a set, tuple, etc when extracted and when saved
+
 def saveToFile(file, data): # Add error handling
+	'''
+	Saves data to a JSON file in JSON format.
+
+	Inputs:
+		file: a valid path to the file
+		data: any data to be encoded into JSON format
+	
+	Actions performed:
+		Encoded json data that's written to a file.
+	
+	Returns:
+		None
+	'''
 	with open(file, mode='w', encoding='utf-8') as f:
 		json.dump(data, f, indent=2)
 
 def loadFromFile(file): # Add error handling
+	'''
+	Loads data from a JSON file to python (still in JSON format so nothing has been converted)
+
+	Inputs:
+		file: a valid path to the file
+	
+	Actions performed: 
+		Encoded JSON data that was extracted from a file
+
+	Returns:
+		Extracted JSON data
+	'''
 	with open(file, mode='r', encoding='utf-8') as f:
 		data = json.load(f)
 		return data
@@ -316,6 +373,11 @@ settingsTemplate = {
 }
 
 currentSettings = None
+
+def writeSettings(name, dir, save, settings):
+	filePres = checkForFile(name, dir)
+	if filePres[0] == True:
+		pass
 
 def readSettings(name, dir):
 	# add input validation for name and director
