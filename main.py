@@ -45,13 +45,13 @@ maxRetries = 2
 
 # functions
 
-def funcErrorOutput(errortype, rawError, comments='No comments provided.'):
+def funcErrorOutput(errortype: str, rawError: Exception, comments='No comments provided.') -> None: 
 	'''
 	Prints an error with the name of the function that called it, the type of error, 
 	the raw error information, the line it occured on, and any passed comments.	
 
-	Inputs:
-		errortype: string containing the name of the error
+	Args:
+		errortype (string): The name of the error
 		rawError: the exception (exception as e)
 		comments: Optional but a string that is provided
 	
@@ -66,12 +66,12 @@ def funcErrorOutput(errortype, rawError, comments='No comments provided.'):
 	print('\n') # newline for clarity
 	console.print(f'[error]{inspect.currentframe().f_back.f_code.co_name}: {errortype}[/error]\n  Passed comments: {comments}\n  Line: {lineNum}\n  Raw error: {rawError}')
 
-def funcWarnOutput(warnType, rawWarn=None, comments='No comments provided.'):
+def funcWarnOutput(warnType: str, rawWarn=None, comments='No comments provided.'):
 	'''
 	Actions performed a warning with the name of the function that called it, the type of warning, 
 	the raw exception information, the line it occured on, and any passed comments.	
 
-	Inputs:
+	Args:
 		warnType: string containing the name of the warning
 		rawWarn: the exception (exception as e) (OPTIONAL)
 		comments: Optional but a string that is provided
@@ -90,11 +90,11 @@ def funcWarnOutput(warnType, rawWarn=None, comments='No comments provided.'):
 
 # make some kind of standardization to determine whats a set, tuple, etc when extracted and when saved
 
-def saveToFile(file, data): # Add error handling
+def saveToFile(file:str, data:dict): # Add error handling
 	'''
 	Saves data to a JSON file in JSON format.
 
-	Inputs:
+	Args:
 		file: a valid path to the file
 		data: any data to be encoded into JSON format
 	
@@ -107,11 +107,11 @@ def saveToFile(file, data): # Add error handling
 	with open(file, mode='w', encoding='utf-8') as f:
 		json.dump(data, f, indent=2)
 
-def loadFromFile(file): # Add error handling
+def loadFromFile(file:str): # Add error handling
 	'''
 	Loads data from a JSON file to python (still in JSON format so nothing has been converted)
 
-	Inputs:
+	Args:
 		file: a valid path to the file
 	
 	Actions performed: 
@@ -124,7 +124,23 @@ def loadFromFile(file): # Add error handling
 		data = json.load(f)
 		return data
 
-def checkCatPresense(data, category, rePrompt=True):
+def checkCatPresense(data:dict, category:str, rePrompt=True): # remove re-prompt, leave it up to the function
+	'''
+	Checks the presense of a category from provided JSON data.
+
+	Args:
+		data (dict): The extracted JSON data.
+		category (string): The name of the category.
+		rePrompt (bool): Determines if the user should be reprompted for a category name if it's already found	.
+	
+	Actions performed:
+		Checks provided JSON data for the presence of the provided category.
+
+	Returns:
+		Bool, denoting the presense if rePrompt is disabled.\n
+		String, containing the name of the category if rePrompt is enabled.
+	'''
+
 	if category in data['categories'].keys():
 		if rePrompt == True:
 			change = input(f'A category matching the name provided ({category}) already exists in the current file. Would you like to enter a different name? y/n\n')
@@ -144,7 +160,17 @@ def checkCatPresense(data, category, rePrompt=True):
 				category = input('Name of category: ')
 				return category
 
-def checkForFile(file, path):
+def checkForFile(file:str, path:str):
+	'''
+	Checks if a file exists
+
+	Args:
+		file (string): Name of the file
+		path (string): Path to the driectory to search
+	Actions performed:
+
+	Returns:
+	'''
 	try:
 		for (root, dirs, files) in os.walk(path, topdown=True):
 			if file in files:
@@ -356,6 +382,9 @@ mainOpsDict = {
 
 # settings
 
+settingsName = 'settings.json'
+minSettingsCharCount = 2
+
 settingsTemplate = {
 	'settings': {
 		'reportDir': expenseFilesDir,
@@ -374,10 +403,22 @@ settingsTemplate = {
 
 currentSettings = None
 
-def writeSettings(name, dir, save, settings):
+def writeSettings(name:str, dir:str, save:bool, settings=None):
 	filePres = checkForFile(name, dir)
 	if filePres[0] == True:
-		pass
+		if save == True:
+			try:
+				os.rename(filePres[1], 'settingsOld.json')
+			except PermissionError as pe:
+				funcErrorOutput('PermissionError', pe, f'Permission error when attempting to rename settings file in path {os.path.join(dir,name)}')
+				
+		# create new file from template
+		if settings == None:
+			try:
+				with open(os.path.join(dir, name), 'x', encoding=settingsTemplate['settings']['encoding']) as file:
+					saveToFile(file, settingsTemplate)
+			except PermissionError as pe:
+				funcErrorOutput('PermissionError', pe, f'Permission error when attempting to create new settings file in path {os.path.join(dir, name)}')
 
 def readSettings(name, dir):
 	# add input validation for name and director
@@ -385,9 +426,12 @@ def readSettings(name, dir):
 	filePres = checkForFile(name, dir)
 	if filePres[0] == True:
 		try:
-			if getFileCharCount(filePres[1]) <= 2:
-				funcWarnOutput('File does not meet minimum length requirements', rawWarn=None, comments='settings file character count was less than the minimum required characters for proper syntax.')
-				return None
+			if getFileCharCount(filePres[1]) <= minSettingsCharCount:
+				funcWarnOutput('File does not meet minimum length requirements', rawWarn=None, comments=f'settings file character count was less than the minimum required characters ({minSettingsCharCount}).')
+				print() # newline for beauty
+				choice = input('Would you like to save the old settings file?')
+				if choice in validAgrees:
+					writeSettings(name, dir, True, settingsTemplate)
 			data =  loadFromFile(filePres[1])
 			return data
 		except json.decoder.JSONDecodeError as jde:
@@ -397,17 +441,7 @@ def readSettings(name, dir):
 			funcErrorOutput('JSON Decode Error', jde, f'Error when attempting to parse settings.json file. {fileEmpty if size==0 else backup}, creating new settings file from defaults.')
 			choice = input('Would you like to save the current settings file for manual review? y/n\n')
 			if choice in validAgrees:
-				try:
-					os.rename(filePres[1], 'settingsOld.json')
-				except PermissionError as pe:
-					funcErrorOutput('PermissionError', pe, f'Permission error when attempting to rename settings file in path {os.path.join(dir,name)}')
-				
-				#create new file
-				try:
-					with open(os.path.join(dir, name), 'w+', encoding=settingsTemplate['settings']['encoding']) as file:
-						saveToFile(file, settingsTemplate)
-				except PermissionError as pe:
-					funcErrorOutput('PermissionError', pe, f'Permission error when attempting to create new settings file in path {os.path.join(dir, name)}')
+				writeSettings(name, dir, True, settingsTemplate)
 
 	elif filePres[0] == False:
 		console.print(f'[warn]WARNING: File Not Found[/warn]\nNo file was found, [info]file name provided: {filePres[1]} path provided: {filePres[2]}[/info]')
@@ -438,6 +472,7 @@ currentFile = None
 	for key in mainOpsDict.keys():
 		if chosenOperation.lower == key():
 			pass
+			
 if __name__ == '__main__':
 		while True:
 			try:
