@@ -1,9 +1,11 @@
 import json
 from datetime import date, time, datetime
-#import myUtils
+import myUtils
 import os
 import inspect
 import traceback
+import pickle
+import codecs
 
 #rich imports
 import rich
@@ -32,16 +34,21 @@ console = Console(theme=theme)
 # 	}
 # }
 
-# global vars, make settings file at some point - json maybe
+# global vars
 
+# path shit to get current path to reports dir, add error handling incase it doesn't exist
 currentFilePath = os.path.join(os.path.abspath(__file__), 'reports')
 currentDir = os.path.dirname(currentFilePath)
 parentDir = os.path.dirname(currentDir)
 expenseFilesDir = os.path.join(parentDir, 'reports')
 
-validAgrees = ['y', 'yes']
+codec = 'base64' # codec for pickling functions
 
-maxRetries = 2
+validAgrees = ['y', 'yes'] # basic valid agrees, probably could incorporate into settings
+
+maxRetries = 2 # incorporate into settings maybe?
+
+currentSettings = None # here for funtion use
 
 # functions
 
@@ -124,7 +131,7 @@ def loadFromFile(file:str): # Add error handling
 		data = json.load(f)
 		return data
 
-def checkCatPresense(data:dict, category:str, rePrompt=True): # remove re-prompt, leave it up to the function
+def checkCatPresense(data:dict, category:str, rePrompt=True): # remove re-prompt, leave it up to the function, add error handling
 	'''
 	Checks the presense of a category from provided JSON data.
 
@@ -160,7 +167,7 @@ def checkCatPresense(data:dict, category:str, rePrompt=True): # remove re-prompt
 				category = input('Name of category: ')
 				return category
 
-def checkForFile(file:str, path:str):
+def checkForFile(file:str, path:str): # improve error handling
 	'''
 	Checks if a file exists
 
@@ -170,6 +177,8 @@ def checkForFile(file:str, path:str):
 	Actions performed:
 
 	Returns:
+		True, fullPath to file (if sucessfully found)
+		False, file, path (if unsucessfully found)
 	'''
 	try:
 		for (root, dirs, files) in os.walk(path, topdown=True):
@@ -187,17 +196,13 @@ def getFileCharCount(path):
 	except Exception as e:
 		pass
 
-# menus
+def pickleFunc(func):
+	pickled = codecs.encode(pickle.dumps(func), codec).decode()
+	return pickled
 
-def mainMenu():
-	print(align.Align('[white bold]Main Menu[/white bold]', align='center'))
-	print('1. Open file')
-	print('2. Settings')
-	print('3. Help')
-	print('4. Exit')
-
-def settingsMenu(file):
-	pass
+def unpickleFunc(pickledFunc):
+	unPickled = pickle.loads(codecs.decode(pickledFunc.encode(), codec))
+	return unPickled
 
 # commands
 
@@ -371,16 +376,25 @@ def removeCategory(file): # add error handling
 		saveToFile(file, data)
 		print('Category removed successfully.')
 
+def openFile(fileName):
+	# input validation
+	filePres = checkForFile(fileName, currentSettings['settings']['reportDir'])
+	if filePres[0] == True: # file found
+		currentFile = filePres[1]
+
 # command mapping
 commandsDict = {
-	('addexpense', 'add expense', 'add-expense', 'add_expense', 'ae') : addExpense
+	'addExpense' : {
+		'calls': ('addexpense', 'add expense', 'add-expense', 'add_expense', 'ae'),
+		'function' : addExpense
+	}
 }
 
 mainOpsDict = {
 	('openfile', 'open file', 'open_file', 'open-file', 'of', '1') : None # fix when function made
 }
 
-# settings
+# settings - add editing but loading n stuff is fine probably, run validation tests
 
 settingsName = 'settings.json'
 minSettingsCharCount = 2
@@ -401,27 +415,31 @@ settingsTemplate = {
 	}
 }
 
-currentSettings = None
+
+for key, val in commandsDict.items():
+	print(f'key: {key} val: {val}')
+	pickledFunc = pickleFunc(val['function'])
+	settingsTemplate['settings']['commands'][key] = {'calls': val['calls'], 'function': pickledFunc}
 
 def writeSettings(name:str, dir:str, save:bool, settings=None):
 	filePres = checkForFile(name, dir)
 	if filePres[0] == True:
 		if save == True:
 			try:
-				os.rename(filePres[1], 'settingsOld.json')
+				os.rename(filePres[1], os.path.join(dir, 'settingsOld.json'))
 			except PermissionError as pe:
 				funcErrorOutput('PermissionError', pe, f'Permission error when attempting to rename settings file in path {os.path.join(dir,name)}')
-				
+		
 		# create new file from template
 		if settings == None:
 			try:
-				with open(os.path.join(dir, name), 'x', encoding=settingsTemplate['settings']['encoding']) as file:
-					saveToFile(file, settingsTemplate)
+				with open(os.path.join(dir, name), 'w+', encoding=settingsTemplate['settings']['encoding']) as file:
+					saveToFile(os.path.join(dir, name), settingsTemplate)
 			except PermissionError as pe:
 				funcErrorOutput('PermissionError', pe, f'Permission error when attempting to create new settings file in path {os.path.join(dir, name)}')
 
 def readSettings(name, dir):
-	# add input validation for name and director
+	# add input validation for name and directory
 	
 	filePres = checkForFile(name, dir)
 	if filePres[0] == True:
@@ -431,7 +449,11 @@ def readSettings(name, dir):
 				print() # newline for beauty
 				choice = input('Would you like to save the old settings file?')
 				if choice in validAgrees:
-					writeSettings(name, dir, True, settingsTemplate)
+					writeSettings(name, dir, True)
+				else:
+					writeSettings(name, dir, False)
+				data = loadFromFile(filePres[1])
+				return data
 			data =  loadFromFile(filePres[1])
 			return data
 		except json.decoder.JSONDecodeError as jde:
@@ -442,6 +464,10 @@ def readSettings(name, dir):
 			choice = input('Would you like to save the current settings file for manual review? y/n\n')
 			if choice in validAgrees:
 				writeSettings(name, dir, True, settingsTemplate)
+			else:
+				writeSettings(name, dir, False)
+			data = loadFromFile(filePres[1])
+			return data
 
 	elif filePres[0] == False:
 		console.print(f'[warn]WARNING: File Not Found[/warn]\nNo file was found, [info]file name provided: {filePres[1]} path provided: {filePres[2]}[/info]')
@@ -449,29 +475,48 @@ def readSettings(name, dir):
 		if choice in validAgrees:
 			try:
 				with open(os.path.join(dir, name), 'w+', encoding=settingsTemplate['settings']['encoding']) as file:
-					saveToFile(file, settingsTemplate)
+					saveToFile(filePres[1], settingsTemplate)
+					data = loadFromFile(filePres[1])
+					return data
 			except PermissionError as pe:
 				funcErrorOutput('PermissionError', pe, f'Permission error when attempting to create new settings file in path {os.path.join(dir, name)}')
+
+print(f'parentDir: {parentDir}')
 
 currentSettings = readSettings('settings.json', parentDir)
 
 
 #main global vars
 inMainMenu = False
-currentFile = None
+currentFile = None # Will be a full file path to the currently open file
 
-# testing
-#os.path.join(expenseFilesDir, 'test.json')
-#removeCategory(os.path.join(expenseFilesDir, 'test.json'))
+def runCmdFromSettings(com): # move somewhere better or don't even make a function idk
+	for key, val in currentSettings['settings']['commands'].items():
+		if com in val['calls']:
+			unpickledCommand = unpickleFunc(val['function'])
+			unpickledCommand()
+
+# menus
+
+def mainMenu():
+	inMainMenu = True
+	print(align.Align('[white bold]Main Menu[/white bold]', align='center'))
+	print('1. Open file')
+	print('2. Settings')
+	print('3. Help')
+	print('4. Exit')
+
+def settingsMenu(file): # add later
+	pass
 
 # main program loop
 """ def main():
 	mainMenu()
-	inMainMenu = True
 	chosenOperation = input()
-	for key in mainOpsDict.keys():
-		if chosenOperation.lower == key():
-			pass
+	if inMainMenu = True:
+		for key in mainOpsDict.keys():
+			if chosenOperation.lower == key():
+				pass
 			
 if __name__ == '__main__':
 		while True:

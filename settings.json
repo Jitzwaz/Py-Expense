@@ -1,0 +1,24 @@
+{
+  "settings": {
+    "reportDir": "g:\\programming stuff\\practice stuff\\python\\CLI-Expense-Tracker\\reports",
+    "reportIndent": 2,
+    "encoding": "utf-8",
+    "commands": {
+      "addExpense": {
+        "calls": [
+          "addexpense",
+          "add expense",
+          "add-expense",
+          "add_expense",
+          "ae"
+        ],
+        "function": "gASVGwAAAAAAAACMCF9fbWFpbl9flIwKYWRkRXhwZW5zZZSTlC4=\n"
+      }
+    },
+    "styles": {
+      "info": "dim cyan",
+      "warning": "yellow",
+      "error": "bold red"
+    }
+  }
+}
