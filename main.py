@@ -1,32 +1,44 @@
 import json
 from datetime import date, time, datetime
-import myUtils
 import os
+import sys
 import inspect
 import traceback
-import pickle
-import codecs
 
-#rich imports
+# sweet ass styling stuff
+import pyfiglet
 import rich
 from rich import print, align
 from rich.columns import Columns
 from rich.console import Console
 from rich.theme import Theme
+from tqdm.rich import tqdm_rich
+from rich.progress import (BarColumn, MofNCompleteColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn)
 
-theme = Theme({
+theme = Theme({ # move and read from settings or something
     "info": "cyan",
     "warn": "yellow",
     "error": "bold red"
 })
+
+customProgressColumns = (
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+		TextColumn('Reading file.'),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TextColumn("[cyan]| Time Elapsed: [/cyan]"),
+        TimeElapsedColumn(),
+        TextColumn("[cyan]| Time remaining: [/cyan]"),
+        TimeRemainingColumn(),
+    )
 
 console = Console(theme=theme)
 
 # just for data structure reference
 # template = {
 # 	'categories': {
-# 		'food': {
-# 			'burger': {
+# 		'category': {
+# 			'expense': {
 # 				'Amount': 12,
 # 				'Date': '10/12/25'
 # 			}
@@ -35,6 +47,8 @@ console = Console(theme=theme)
 # }
 
 # global vars
+
+version = '1.0.0'
 
 # path shit to get current path to reports dir, add error handling incase it doesn't exist
 currentFilePath = os.path.join(os.path.abspath(__file__), 'reports')
@@ -45,10 +59,12 @@ expenseFilesDir = os.path.join(parentDir, 'reports')
 codec = 'base64' # codec for pickling functions
 
 validAgrees = ['y', 'yes'] # basic valid agrees, probably could incorporate into settings
+validExits = ['esc']
 
 maxRetries = 2 # incorporate into settings maybe?
 
 currentSettings = None # here for funtion use
+
 
 # functions
 
@@ -127,8 +143,18 @@ def loadFromFile(file:str): # Add error handling
 	Returns:
 		Extracted JSON data
 	'''
-	with open(file, mode='r', encoding='utf-8') as f:
-		data = json.load(f)
+	with open(file, mode='rb') as f:
+		extractedData = b''
+		sizeOfFile = os.path.getsize(file)
+		with tqdm_rich(total=sizeOfFile, unit='B', unit_scale=True, desc='Reading file', progress=customProgressColumns) as pBar:
+			while True:
+				chunk = f.read(1024)
+				extractedData +=chunk
+				if not chunk:
+					break
+				pBar.update(len(chunk))
+		extractedData = extractedData.decode('utf-8')
+		data = json.loads(extractedData)
 		return data
 
 def checkCatPresense(data:dict, category:str, rePrompt=True): # remove re-prompt, leave it up to the function, add error handling
@@ -185,7 +211,7 @@ def checkForFile(file:str, path:str): # improve error handling
 			if file in files:
 				return True, os.path.join(root, file)
 	except Exception as e:
-		pass
+		funcErrorOutput('General exception', e, 'idk man')
 	return False, file, path
 
 def getFileCharCount(path):
@@ -196,14 +222,10 @@ def getFileCharCount(path):
 	except Exception as e:
 		pass
 
-def pickleFunc(func):
-	pickled = codecs.encode(pickle.dumps(func), codec).decode()
-	return pickled
-
-def unpickleFunc(pickledFunc):
-	unPickled = pickle.loads(codecs.decode(pickledFunc.encode(), codec))
-	return unPickled
-
+def asciiPrint(text, style, color, alignment='left', width=50):
+	f = pyfiglet.Figlet(font=style)
+	asciiText = pyfiglet.figlet_format(text, font=style, width=width)
+	print(align.Align(f'[{color}]{asciiText}[/{color}]', align=alignment))
 # commands
 
 def addExpense(file): # add error handling
@@ -376,25 +398,50 @@ def removeCategory(file): # add error handling
 		saveToFile(file, data)
 		print('Category removed successfully.')
 
-def openFile(fileName):
-	# input validation
-	filePres = checkForFile(fileName, currentSettings['settings']['reportDir'])
+# Main operations
+
+def openFile(): # add input validation and error handling
+	fileName = input('What expense file would you like to open?\n ')
+	filePres = checkForFile(fileName+'.json', currentSettings['settings']['reportDir'])
 	if filePres[0] == True: # file found
+		global currentFile
+		global inMainMenu
+		inMainMenu = False
 		currentFile = filePres[1]
+		console.print('[info]File successfully opened.[/info]')
+
+def closeFile(): # add input validation and error handling
+	global currentFile
+	choice =  input('Are you sure you want to close the current file (Y/N)? ')
+	if choice in validAgrees:
+		currentFile = None
+
+def close():
+	choice = input('Are you sure you want to close the program (Y/N)? ')
+	if choice in validAgrees:
+		print('Closing.')
+		sys.exit()
 
 # command mapping
 commandsDict = {
 	'addExpense' : {
-		'calls': ('addexpense', 'add expense', 'add-expense', 'add_expense', 'ae'),
+		'calls' : ('addexpense', 'add expense', 'add-expense', 'add_expense', 'ae'),
 		'function' : addExpense
 	}
 }
 
 mainOpsDict = {
-	('openfile', 'open file', 'open_file', 'open-file', 'of', '1') : None # fix when function made
+	'openFile' : {
+		'calls' : ('openfile', 'open file', 'open_file', 'open-file', 'of', '1'),
+		'function' : openFile
+	},
+	'close' : {
+		'calls' : ('exit', '4'),
+		'function' : close
+	}
 }
 
-# settings - add editing but loading n stuff is fine probably, run validation tests
+# settings - add editing but loading n stuff is fine probably, run validation tests also add customizeable command calls
 
 settingsName = 'settings.json'
 minSettingsCharCount = 2
@@ -404,9 +451,6 @@ settingsTemplate = {
 		'reportDir': expenseFilesDir,
 		'reportIndent': 2,
 		'encoding': 'utf-8',
-		'commands': {
-			#read in commands from commandsDict ig for defaults, maybe add custom command support?
-		},
 		'styles':{
 			"info": "dim cyan",
 		    "warning": "yellow",
@@ -414,12 +458,6 @@ settingsTemplate = {
 		}
 	}
 }
-
-
-for key, val in commandsDict.items():
-	print(f'key: {key} val: {val}')
-	pickledFunc = pickleFunc(val['function'])
-	settingsTemplate['settings']['commands'][key] = {'calls': val['calls'], 'function': pickledFunc}
 
 def writeSettings(name:str, dir:str, save:bool, settings=None):
 	filePres = checkForFile(name, dir)
@@ -487,41 +525,69 @@ currentSettings = readSettings('settings.json', parentDir)
 
 
 #main global vars
+startup = True
 inMainMenu = False
-currentFile = None # Will be a full file path to the currently open file
-
-def runCmdFromSettings(com): # move somewhere better or don't even make a function idk
-	for key, val in currentSettings['settings']['commands'].items():
-		if com in val['calls']:
-			unpickledCommand = unpickleFunc(val['function'])
-			unpickledCommand()
+currentFile = None # Will be a full file path to the currently open file	
 
 # menus
 
 def mainMenu():
-	inMainMenu = True
-	print(align.Align('[white bold]Main Menu[/white bold]', align='center'))
-	print('1. Open file')
-	print('2. Settings')
-	print('3. Help')
-	print('4. Exit')
+	try:
+		global startup
+		global inMainMenu
+		inMainMenu = True
+		startup = False
+		asciiPrint('Main menu', 'slant', 'cyan', 'center', 100)
+		if currentFile != None:
+			console.print(f'[info]Currently open file: {os.path.basename(currentFile).split('.')[0]}[/info]\n')
+		
+		print(f'[cyan]Py-Expense v{version} by Jitzwaz[/cyan]')
+		print()
+		print('[cyan]1.[/cyan] Open file')
+		print('[cyan]2.[/cyan] Settings')
+		print('[cyan]3.[/cyan] Help')
+		print('[cyan]4.[/cyan] Exit')
+	except Exception as e:
+		funcErrorOutput('General Exception', e)
 
 def settingsMenu(file): # add later
 	pass
 
 # main program loop
-""" def main():
-	mainMenu()
-	chosenOperation = input()
-	if inMainMenu = True:
-		for key in mainOpsDict.keys():
-			if chosenOperation.lower == key():
-				pass
-			
+def main():
+	try:
+		global inMainMenu
+		global currentFile
+		global startup
+		
+		if startup == True:
+			mainMenu()
+		if currentFile != None and inMainMenu == False:
+			print()
+			console.print(f'[info]Currently open file: {os.path.basename(currentFile).split('.')[0]}[/info]\n')
+		chosenOperation = input('>>> ')
+		if inMainMenu == True:
+			for key in mainOpsDict.keys():
+				if chosenOperation.lower() in mainOpsDict[key]['calls']:
+					func = mainOpsDict[key]['function']
+					func()
+			if currentFile != None:
+				inMainMenu = False
+		elif inMainMenu == False:
+			for key in commandsDict.keys():
+				if chosenOperation.lower() in commandsDict[key]['calls']:
+					func = commandsDict[key]['function']
+					print(f'type currentFile: {type(currentFile)}\ncurrentFile: {currentFile}')
+					func(currentFile)
+	except KeyboardInterrupt:
+		print()
+		mainMenu()
+
 if __name__ == '__main__':
 		while True:
 			try:
 				main()
 			except KeyboardInterrupt:
-				print('Returning to main menu.')
-			except Exception as e: """
+				mainMenu
+			#except Exception as e:
+			#	funcErrorOutput('Exception', e, 'General exception from main loop.')
