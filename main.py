@@ -53,6 +53,11 @@ version = '1.0.0'
 versionList = version.split('.')
 versionKeywords = ['security', 'high', 'medium', 'low']
 
+# move to settings
+catIndent = 0
+expenseIndent = 2
+expenseSutffIndent = 4
+
 
 # path shit to get current path to reports dir, add error handling incase it doesn't exist
 currentFilePath = os.path.join(os.path.abspath(__file__), 'reports')
@@ -218,7 +223,7 @@ def checkCatPresense(data:dict, category:str, rePrompt=True): # remove re-prompt
 
 	if category in data['categories'].keys():
 		if rePrompt == True:
-			change = input(f'A category matching the name provided ({category}) already exists in the current file. Would you like to enter a different name? y/n\n')
+			change = input(f'A category matching the name provided ({category}) already exists in the current file. Would you like to enter a different name (Y/N)?\n')
 			if change in validAgrees:
 				category = input('Name of category: ')
 				return category
@@ -230,7 +235,7 @@ def checkCatPresense(data:dict, category:str, rePrompt=True): # remove re-prompt
 		if rePrompt == False:
 			return False
 		elif rePrompt == False:
-			change = input(f'A category matching the name provided ({category}) could not be found in the current file. Would you like to ender a different name? y/n\n')
+			change = input(f'A category matching the name provided ({category}) could not be found in the current file. Would you like to ender a different name(Y/N)?\n')
 			if change in validAgrees:
 				category = input('Name of category: ')
 				return category
@@ -293,7 +298,6 @@ def addExpense(file): # add error handling
 		return
 
 	dataFromFile = loadFromFile(file)
-	print(f'datafromfile:{dataFromFile}')
 
 	# invalid input error handling when i get around to it
 	
@@ -335,16 +339,17 @@ def removeExpense(file): # add error handling
 		timesChecked += 1
 		if expenseCat in dataFromFile['categories']:
 			if expenseName in dataFromFile['categories'][expenseCat].keys():
-				if expenseDate not in dataFromFile['categories'][expenseCat][expenseName]['Date']:
-					change = input(f'The expense you are trying to {operation} ({expenseName}) could not be found with a matching date, would you like to change the date? y/n\n')
-					if change in validAgrees:
-						expenseDate = input('Date of expense: ')
-						checkExpensePresense(operation)
-					else:
-						print('Aborting command.')
-						return False
-				elif expenseVal not in dataFromFile['categories'][expenseCat][expenseName]['Amount']:
-					change = input(f'The expense you are trying to {operation} ({expenseName}) could not be found with a matching amount, would you like to change the amount? y/n\n')
+				if expenseDate != None:
+					if expenseDate != dataFromFile['categories'][expenseCat][expenseName]['Date']:
+						change = input(f'The expense you are trying to {operation} ({expenseName}) could not be found with a matching date, would you like to change the date (Y/N)?\n')
+						if change in validAgrees:
+							expenseDate = input('Date of expense: ')
+							checkExpensePresense(operation)
+						else:
+							print('Aborting command.')
+							return False
+				elif expenseVal != dataFromFile['categories'][expenseCat][expenseName]['Amount']:
+					change = input(f'The expense you are trying to {operation} ({expenseName}) could not be found with a matching amount, would you like to change the amount (Y/N)?\n')
 					if change in validAgrees:
 						expenseVal = input('Amount of expense: ')
 						checkExpensePresense(operation)
@@ -352,7 +357,7 @@ def removeExpense(file): # add error handling
 						print('Aborting command.')
 						return False
 			elif expenseName not in dataFromFile['categories'][expenseCat].keys():
-				change = input(f'The expense you are trying to {operation} ({expenseName}) has not been found by, would you like to change the name? y/n\n')
+				change = input(f'The expense you are trying to {operation} ({expenseName}) has not been found by, would you like to change the name (Y/N)?\n')
 				if change in validAgrees:
 					expenseName = input('Name of expense: ')
 					checkExpensePresense(operation)
@@ -369,14 +374,14 @@ def removeExpense(file): # add error handling
 		if expense != None:
 			if expenseDate != None:
 				if expense['Date'] == expenseDate:
-					yn = input(f'Are you sure you want to delete the following expense?\nName: {expenseName}\nCategory: {expenseCat}\nAmount: {expense['Amount']}\nDate: {expenseDate}\n y/n?')
+					yn = input(f'Are you sure you want to delete the following expense?\nName: {expenseName}\nCategory: {expenseCat}\nAmount: {expense['Amount']}\nDate: {expenseDate} (Y/N)?\n')
 					if yn in validAgrees:
 						dataFromFile['categories'][expenseCat].pop(expenseName)
 						saveToFile(file, dataFromFile)
 						print('Expense removed from file.')
 			elif expenseVal != None:
 				if expense['Amount'] == expenseVal:
-					yn = input(f'Are you sure you want to delete the following expense?\nName: {expenseName}\nCategory: {expenseCat}\nAmount: {expense['Amount']}\nDate: {expense['Date']}\n y/n?')
+					yn = input(f'Are you sure you want to delete the following expense?\nName: {expenseName}\nCategory: {expenseCat}\nAmount: {expense['Amount']}\nDate: {expense['Date']} (Y/N)\n')
 					if yn in validAgrees:
 						dataFromFile['categories'][expenseCat].pop(expenseName)
 						saveToFile(file, dataFromFile)
@@ -433,12 +438,27 @@ def removeCategory(file): # add error handling
 			print(f'Aborting command due to invalid category input.')
 			return
 	
-	choice = input(f'Are you sure you want to delete {category}? y/n\n')
+	choice = input(f'Are you sure you want to delete {category} (Y/N)?\n')
 
 	if choice in validAgrees:
 		data['categories'].pop(category) # add try/except wrapper
 		saveToFile(file, data)
 		print('Category removed successfully.')
+
+def viewAllExpenses(file):
+	data = loadFromFile(file)
+	for cat in data['categories'].keys():
+		print(f'{cat}:')
+		for expense in data['categories'][cat].keys():
+			printOut = ''+(' '*expenseIndent)
+			printOut+=f'{expense}:'
+			print(printOut)
+			for key, val in data['categories'][cat][expense].items():
+				printOut = ''+(' '*expenseSutffIndent)
+				printOut+=f'{key} : {val}'
+				print(printOut)
+			print()
+
 
 # Main operations
 
@@ -469,6 +489,30 @@ commandsDict = {
 	'addExpense' : {
 		'calls' : ('addexpense', 'add expense', 'add-expense', 'add_expense', 'ae'),
 		'function' : addExpense
+	},
+	'removeExpense' : {
+		'calls' : ('removeexpense', 'remove expense', 'remove-expense', 'remove_expense', 're'),
+		'function' : removeExpense
+	},
+	'addCategory' : {
+		'calls' : ('addcategory', 'add category', 'add_category', 'add-category', 'ac'),
+		'function' : addCategory
+	},
+	'removeCategory' : {
+		'calls' : ('removecategory', 'remove category', 'remove_category', 'remove-category', 'rc'),
+		'function' : removeCategory
+	},
+	'openFile' : {
+		'calls' : ('openfile', 'open file', 'open_file', 'open-file', 'of'),
+		'function' : openFile
+	},
+	'closeFile' : {
+		'calls' : ('closefile', 'close file', 'close_file', 'close-file', 'cf'),
+		'function' : closeFile
+	},
+	'viewAllExpenses' : {
+		'calls' : ('viewallexpenses', 'view all expenses', 'view_all_expenses', 'view-all-expenses', 'vae'),
+		'function' : viewAllExpenses
 	}
 }
 
@@ -541,7 +585,7 @@ def readSettings(name, dir):
 			fileEmpty = 'The file is empty'
 			backup = 'The file may have syntax errors inside.'
 			funcErrorOutput('JSON Decode Error', jde, f'Error when attempting to parse settings.json file. {fileEmpty if size==0 else backup}, creating new settings file from defaults.')
-			choice = input('Would you like to save the current settings file for manual review? y/n\n')
+			choice = input('Would you like to save the current settings file for manual review (Y/N)?\n')
 			if choice in validAgrees:
 				writeSettings(name, dir, True, settingsTemplate)
 			else:
@@ -551,7 +595,7 @@ def readSettings(name, dir):
 
 	elif filePres[0] == False:
 		console.print(f'[warn]WARNING: File Not Found[/warn]\nNo file was found, [info]file name provided: {filePres[1]} path provided: {filePres[2]}[/info]')
-		choice = input('Would you like to create a new settings file from the default settings? y/n\n')
+		choice = input('Would you like to create a new settings file from the default settings (Y/N)?\n')
 		if choice in validAgrees:
 			try:
 				with open(os.path.join(dir, name), 'w+', encoding=settingsTemplate['settings']['encoding']) as file:
@@ -597,41 +641,45 @@ def mainMenu():
 def settingsMenu(file): # add later
 	pass
 
-# main program loop
-def main():
-	try:
-		global inMainMenu
-		global currentFile
-		global startup
-		
-		if startup == True:
-			mainMenu()
-		if currentFile != None and inMainMenu == False:
-			print()
-			console.print(f'[info]Currently open file: {os.path.basename(currentFile).split('.')[0]}[/info]\n')
-		chosenOperation = input('>>> ')
-		if inMainMenu == True:
-			for key in mainOpsDict.keys():
-				if chosenOperation.lower() in mainOpsDict[key]['calls']:
-					func = mainOpsDict[key]['function']
-					func()
-			if currentFile != None:
-				inMainMenu = False
-		elif inMainMenu == False:
-			for key in commandsDict.keys():
-				if chosenOperation.lower() in commandsDict[key]['calls']:
-					func = commandsDict[key]['function']
-					print(f'type currentFile: {type(currentFile)}\ncurrentFile: {currentFile}')
-					func(currentFile)
-	except KeyboardInterrupt:
-		print()
-		mainMenu()
+#viewAllExpenses(os.path.join(expenseFilesDir, 'test.json'))
 
-if __name__ == '__main__':
-		while True:
-			try:
-				main()
-			except KeyboardInterrupt:
-				mainMenu
-			#except Exception as e:
-			#	funcErrorOutput('Exception', e, 'General exception from main loop.')
+runningMainloop = True
+
+# main program loop
+if runningMainloop == True:
+	def main():
+		try:
+			global inMainMenu
+			global currentFile
+			global startup
+			
+			if startup == True:
+				mainMenu()
+			if currentFile != None and inMainMenu == False:
+				print()
+				console.print(f'[info]Currently open file: {os.path.basename(currentFile).split('.')[0]}[/info]\n')
+			chosenOperation = input('>>> ')
+			if inMainMenu == True:
+				for key in mainOpsDict.keys():
+					if chosenOperation.lower() in mainOpsDict[key]['calls']:
+						func = mainOpsDict[key]['function']
+						func()
+				if currentFile != None:
+					inMainMenu = False
+			elif inMainMenu == False:
+				for key in commandsDict.keys():
+					if chosenOperation.lower() in commandsDict[key]['calls']:
+						func = commandsDict[key]['function']
+						func(currentFile)
+		except KeyboardInterrupt:
+			print()
+			mainMenu()
+
+	if __name__ == '__main__':
+			while True:
+				try:
+					main()
+				except KeyboardInterrupt:
+					mainMenu
+				#except Exception as e:
+				#	funcErrorOutput('Exception', e, 'General exception from main loop.')
