@@ -14,6 +14,7 @@ from rich.console import Console
 from rich.theme import Theme
 from tqdm.rich import tqdm_rich
 from rich.progress import (BarColumn, MofNCompleteColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn)
+import requests
 
 theme = Theme({ # move and read from settings or something
     "info": "cyan",
@@ -49,6 +50,9 @@ console = Console(theme=theme)
 # global vars
 
 version = '1.0.0'
+versionList = version.split('.')
+versionKeywords = ['security', 'high', 'medium', 'low']
+
 
 # path shit to get current path to reports dir, add error handling incase it doesn't exist
 currentFilePath = os.path.join(os.path.abspath(__file__), 'reports')
@@ -67,6 +71,44 @@ currentSettings = None # here for funtion use
 
 
 # functions
+
+def checkVersion():
+	response  = requests.get('https://api.github.com/repos/Jitzwaz/Py-Expense/releases/latest')
+
+	data = response.json()
+
+	verNum = data['name']
+	relBody =data['body']
+
+	posDict = {
+		'0' : 'major',
+		'1' : 'minor',
+		'2' : 'patch'
+	}
+
+	msgsDict = {
+		'high' : 'high urgency',
+		'medium' : 'medium urgency',
+		'low' : 'low urgency',
+		'security' : 'security'
+	}
+
+	msg = 'There is a(n) '
+
+	for keyword in versionKeywords:
+		if keyword in relBody.lower():
+			msg+=f'{msgsDict[keyword]} '
+
+	verNumList = verNum[1::].split('.')
+	for i, curVerNum in enumerate(versionList):
+		if int(curVerNum) < int(verNumList[i]):
+			msg+=posDict[str(i)]
+			if i != 2:
+				msg+=' update available.'
+			elif i == 2:
+				msg+= ' available.'
+	console.print(f'[info]{msg}[/info]')
+	console.print(f'[info]Currently installed version: {version}, Latest available version: {verNum}[/info]')
 
 def funcErrorOutput(errortype: str, rawError: Exception, comments='No comments provided.') -> None: 
 	'''
@@ -543,6 +585,8 @@ def mainMenu():
 		
 		print(f'[cyan]Py-Expense v{version} by Jitzwaz[/cyan]')
 		print()
+		#checkVersion()
+		#print()
 		print('[cyan]1.[/cyan] Open file')
 		print('[cyan]2.[/cyan] Settings')
 		print('[cyan]3.[/cyan] Help')

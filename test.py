@@ -1,44 +1,46 @@
-import os
-from tqdm.rich import tqdm_rich
-from rich.progress import (BarColumn, MofNCompleteColumn, TextColumn, TimeElapsedColumn, TimeRemainingColumn)
-import json
+import requests
 
-customProgressColumns = (
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        TextColumn("[cyan]|[/cyan]"),
-        TimeElapsedColumn(),
-        TextColumn("[cyan]|[/cyan]"),
-        TimeRemainingColumn(),
-    )
+version = '1.0.0'
+versionList = version.split('.')
 
-def loadFromFile(file:str): # Add error handling
-	'''
-	Loads data from a JSON file to python (still in JSON format so nothing has been converted)
+versionKeywords = ['security', 'high', 'medium', 'low']
 
-	Args:
-		file: a valid path to the file
-	
-	Actions performed: 
-		Encoded JSON data that was extracted from a file
+def checkVersion():
+	response  = requests.get('https://api.github.com/repos/Jitzwaz/Py-Expense/releases/latest')
 
-	Returns:
-		Extracted JSON data
-	'''
-	with open(file, mode='rb') as f:
-		extractedData = b''
-		sizeOfFile = os.path.getsize(file)
-		with tqdm_rich(total=sizeOfFile, unit='B', unit_scale=True, desc='Reading file', progress=customProgressColumns) as pBar:
-			while True:
-				chunk = f.read(1024)
-				extractedData +=chunk
-				if not chunk:
-					break
-				pBar.update(len(chunk))
-		extractedData = extractedData.decode('utf-8')
-		data = json.loads(extractedData)
-		return data
+	data = response.json()
 
+	verNum = data['name']
+	relBody =data['body']
 
-loadFromFile('G:\programming stuff\practice stuff\python\CLI-Expense-Tracker\settings.json')
+	posDict = {
+		'0' : 'major',
+		'1' : 'minor',
+		'2' : 'patch'
+	}
+
+	msgsDict = {
+		'high' : 'high urgency',
+		'medium' : 'medium urgency',
+		'low' : 'low urgency',
+		'security' : 'security'
+	}
+
+	msg = 'There is a(n) '
+
+	for keyword in versionKeywords:
+		if keyword in relBody.lower():
+			msg+=f'{msgsDict[keyword]} '
+
+	verNumList = verNum[1::].split('.')
+	for i, curVerNum in enumerate(versionList):
+		if int(curVerNum) < int(verNumList[i]):
+			msg+=posDict[str(i)]
+			if i != 2:
+				msg+=' update available.'
+			elif i == 2:
+				msg+= ' available.'
+	print(msg)
+	print(f'Currently installed version: {version}, Latest available version: {verNum}')
+
+checkVersion()
