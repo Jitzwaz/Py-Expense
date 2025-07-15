@@ -58,22 +58,36 @@ catIndent = 0
 expenseIndent = 2
 expenseSutffIndent = 4
 
+states = {
+	'menus' : {
+		'inMainMenu' : False,
+		'inSettingsMenu' : False,
+		'inHelpMenu' : False
+	},
+	'currentFile' : None,
+	'startup' : True
+}
+
 
 # path shit to get current path to reports dir, add error handling incase it doesn't exist
-currentFilePath = os.path.join(os.path.abspath(__file__), 'reports')
-currentDir = os.path.dirname(currentFilePath)
-parentDir = os.path.dirname(currentDir)
-expenseFilesDir = os.path.join(parentDir, 'reports')
-
-codec = 'base64' # codec for pickling functions
+# move to after settings to do only on first startup?
+currentFilePath = None
+currentDir = None
+parentDir = None
+expenseFilesDir = None
+try:
+	currentFilePath = os.path.join(os.path.abspath(__file__), 'reports')
+	currentDir = os.path.dirname(currentFilePath)
+	parentDir = os.path.dirname(currentDir)
+	expenseFilesDir = os.path.join(parentDir, 'reports')
+except Exception as e: # idk what else could happen tbh
+	console.print('[error]ERROR Unable to read current file paths[/error]')
 
 validAgrees = ['y', 'yes'] # basic valid agrees, probably could incorporate into settings
-validExits = ['esc']
 
 maxRetries = 2 # incorporate into settings maybe?
 
 currentSettings = None # here for funtion use
-
 
 # functions
 
@@ -83,7 +97,7 @@ def checkVersion():
 	data = response.json()
 
 	verNum = data['name']
-	relBody =data['body']
+	relBody = data['body']
 
 	posDict = {
 		'0' : 'major',
@@ -261,7 +275,7 @@ def checkForFile(file:str, path:str): # improve error handling
 		funcErrorOutput('General exception', e, 'idk man')
 	return False, file, path
 
-def getFileCharCount(path):
+def getFileCharCount(path): # add error handling
 	try:
 		with open(path, 'r') as file:
 			content = file.read()
@@ -273,6 +287,7 @@ def asciiPrint(text, style, color, alignment='left', width=50):
 	f = pyfiglet.Figlet(font=style)
 	asciiText = pyfiglet.figlet_format(text, font=style, width=width)
 	print(align.Align(f'[{color}]{asciiText}[/{color}]', align=alignment))
+
 # commands
 
 def addExpense(file): # add error handling
@@ -466,17 +481,14 @@ def openFile(): # add input validation and error handling
 	fileName = input('What expense file would you like to open?\n ')
 	filePres = checkForFile(fileName+'.json', currentSettings['settings']['reportDir'])
 	if filePres[0] == True: # file found
-		global currentFile
-		global inMainMenu
-		inMainMenu = False
-		currentFile = filePres[1]
+		states['menus']['inMainMenu'] = False
+		states['currentFile'] = filePres[1]
 		console.print('[info]File successfully opened.[/info]')
 
 def closeFile(): # add input validation and error handling
-	global currentFile
 	choice =  input('Are you sure you want to close the current file (Y/N)? ')
 	if choice in validAgrees:
-		currentFile = None
+		states['currentFile'] = None
 
 def close():
 	choice = input('Are you sure you want to close the program (Y/N)? ')
@@ -605,41 +617,34 @@ def readSettings(name, dir):
 			except PermissionError as pe:
 				funcErrorOutput('PermissionError', pe, f'Permission error when attempting to create new settings file in path {os.path.join(dir, name)}')
 
-print(f'parentDir: {parentDir}')
-
 currentSettings = readSettings('settings.json', parentDir)
-
-
-#main global vars
-startup = True
-inMainMenu = False
-currentFile = None # Will be a full file path to the currently open file	
 
 # menus
 
 def mainMenu():
 	try:
-		global startup
-		global inMainMenu
-		inMainMenu = True
-		startup = False
+		states['menus']['inMainMenu'] = True
+		states['startup'] = False
 		asciiPrint('Main menu', 'slant', 'cyan', 'center', 100)
-		if currentFile != None:
-			console.print(f'[info]Currently open file: {os.path.basename(currentFile).split('.')[0]}[/info]\n')
+		if states['currentFile'] != None:
+			console.print(f'[info]Currently open file: {os.path.basename(states['currentFile']).split('.')[0]}[/info]\n')
 		
 		print(f'[cyan]Py-Expense v{version} by Jitzwaz[/cyan]')
 		print()
 		#checkVersion()
 		#print()
 		print('[cyan]1.[/cyan] Open file')
-		print('[cyan]2.[/cyan] Settings')
-		print('[cyan]3.[/cyan] Help')
-		print('[cyan]4.[/cyan] Exit')
+		print('[cyan]2.[/cyan] Close file')
+		print('[cyan]3.[/cyan] Settings')
+		print('[cyan]4.[/cyan] Help')
+		print('[cyan]5.[/cyan] Exit')
 	except Exception as e:
 		funcErrorOutput('General Exception', e)
 
 def settingsMenu(file): # add later
 	pass
+
+
 
 #viewAllExpenses(os.path.join(expenseFilesDir, 'test.json'))
 
@@ -649,8 +654,8 @@ runningMainloop = True
 if runningMainloop == True:
 	def main():
 		try:
-			global inMainMenu
-			global currentFile
+			inMainMenu = states['menus']['inMainMenu']
+			currentFile = states['currentFile']
 			global startup
 			
 			if startup == True:
