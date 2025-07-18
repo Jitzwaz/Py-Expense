@@ -4,6 +4,7 @@
     "reportIndent": 2,
     "encoding": "utf-8",
     "styles": {
+      "text" : "white",
       "info": "dim cyan",
       "warning": "yellow",
       "error": "bold red"

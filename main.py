@@ -17,19 +17,20 @@ from rich.progress import (BarColumn, MofNCompleteColumn, TextColumn, TimeElapse
 import requests
 
 theme = Theme({ # move and read from settings or something
-    "info": "cyan",
-    "warn": "yellow",
-    "error": "bold red"
+	'text': 'white',
+    'info': 'cyan',
+    'warn': 'yellow',
+    'error': 'bold red'
 })
 
 customProgressColumns = (
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TextColumn('[progress.percentage]{task.percentage:>3.0f}%'),
 		TextColumn('Reading file.'),
         BarColumn(),
         MofNCompleteColumn(),
-        TextColumn("[cyan]| Time Elapsed: [/cyan]"),
+        TextColumn('[cyan]| Time Elapsed: [/cyan]'),
         TimeElapsedColumn(),
-        TextColumn("[cyan]| Time remaining: [/cyan]"),
+        TextColumn('[cyan]| Time remaining: [/cyan]'),
         TimeRemainingColumn(),
     )
 
@@ -75,15 +76,10 @@ currentFilePath = None
 currentDir = None
 parentDir = None
 expenseFilesDir = None
-try:
-	currentFilePath = os.path.join(os.path.abspath(__file__), 'reports')
-	currentDir = os.path.dirname(currentFilePath)
-	parentDir = os.path.dirname(currentDir)
-	expenseFilesDir = os.path.join(parentDir, 'reports')
-except Exception as e: # idk what else could happen tbh
-	console.print('[error]ERROR Unable to read current file paths[/error]')
 
 validAgrees = ['y', 'yes'] # basic valid agrees, probably could incorporate into settings
+
+validEmptySettings = [None, '']
 
 maxRetries = 2 # incorporate into settings maybe?
 
@@ -129,7 +125,7 @@ def checkVersion():
 	console.print(f'[info]{msg}[/info]')
 	console.print(f'[info]Currently installed version: {version}, Latest available version: {verNum}[/info]')
 
-def funcErrorOutput(errortype: str, rawError: Exception, comments='No comments provided.') -> None: 
+def funcErrorOutput(errortype: str, rawError: Exception, comments:str='No comments provided.', funcArgs:tuple=None) -> None:  # add logging in future update
 	'''
 	Prints an error with the name of the function that called it, the type of error, 
 	the raw error information, the line it occured on, and any passed comments.	
@@ -150,7 +146,7 @@ def funcErrorOutput(errortype: str, rawError: Exception, comments='No comments p
 	print('\n') # newline for clarity
 	console.print(f'[error]{inspect.currentframe().f_back.f_code.co_name}: {errortype}[/error]\n  Passed comments: {comments}\n  Line: {lineNum}\n  Raw error: {rawError}')
 
-def funcWarnOutput(warnType: str, rawWarn=None, comments='No comments provided.'):
+def funcWarnOutput(warnType: str, rawWarn=None, comments='No comments provided.', funcArgs:tuple=None):
 	'''
 	Actions performed a warning with the name of the function that called it, the type of warning, 
 	the raw exception information, the line it occured on, and any passed comments.	
@@ -174,7 +170,7 @@ def funcWarnOutput(warnType: str, rawWarn=None, comments='No comments provided.'
 
 # make some kind of standardization to determine whats a set, tuple, etc when extracted and when saved
 
-def saveToFile(file:str, data:dict): # Add error handling
+def saveToFile(file:str, data:dict):
 	'''
 	Saves data to a JSON file in JSON format.
 
@@ -188,10 +184,17 @@ def saveToFile(file:str, data:dict): # Add error handling
 	Returns:
 		None
 	'''
-	with open(file, mode='w', encoding='utf-8') as f:
-		json.dump(data, f, indent=2)
+	try:
+		with open(file, mode='w', encoding='utf-8') as f:
+			json.dump(data, f, indent=currentSettings['settings']['reportIndent'])
+	except PermissionError as pe:
+		funcErrorOutput('Permission Error', pe, f'Permission error when attempting to save data to file ({file})')
+		# test below before implementing
+		#console.print('[info]Dumping provided data to dump.json[/info]')
+		#with open(os.path.join(parentDir, 'dump.json'), mode='a', encoding='utf-8') as file:
+		#	json.dump(data, file, indent=currentSettings['settings']['reportIndent'])
 
-def loadFromFile(file:str): # Add error handling
+def loadFromFile(file:str):
 	'''
 	Loads data from a JSON file to python (still in JSON format so nothing has been converted)
 
@@ -204,21 +207,26 @@ def loadFromFile(file:str): # Add error handling
 	Returns:
 		Extracted JSON data
 	'''
-	with open(file, mode='rb') as f:
-		extractedData = b''
-		sizeOfFile = os.path.getsize(file)
-		with tqdm_rich(total=sizeOfFile, unit='B', unit_scale=True, desc='Reading file', progress=customProgressColumns) as pBar:
-			while True:
-				chunk = f.read(1024)
-				extractedData +=chunk
-				if not chunk:
-					break
-				pBar.update(len(chunk))
-		extractedData = extractedData.decode('utf-8')
-		data = json.loads(extractedData)
-		return data
+	try:
+		with open(file, mode='rb') as f:
+			extractedData = b''
+			sizeOfFile = os.path.getsize(file)
+			with tqdm_rich(total=sizeOfFile, unit='B', unit_scale=True, desc='Reading file', progress=customProgressColumns) as pBar:
+				while True:
+					chunk = f.read(1024)
+					extractedData +=chunk
+					if not chunk:
+						break
+					pBar.update(len(chunk))
+			extractedData = extractedData.decode('utf-8')
+			data = json.loads(extractedData)
+			return data
+	except PermissionError as pe:
+		funcErrorOutput('Permission Error', pe, 'Permission error occured while attempting to load file.')
+	except json.JSONDecodeError as JDE:
+		funcErrorOutput('Json Decode Error', JDE, 'JSON Decode Error when attempting to load file.')
 
-def checkCatPresense(data:dict, category:str, rePrompt=True): # remove re-prompt, leave it up to the function, add error handling
+def checkCatPresense(data:dict, category:str, rePrompt=True): # remove re-prompt and leave it up to the function
 	'''
 	Checks the presense of a category from provided JSON data.
 
@@ -234,27 +242,30 @@ def checkCatPresense(data:dict, category:str, rePrompt=True): # remove re-prompt
 		Bool, denoting the presense if rePrompt is disabled.\n
 		String, containing the name of the category if rePrompt is enabled.
 	'''
-
-	if category in data['categories'].keys():
-		if rePrompt == True:
-			change = input(f'A category matching the name provided ({category}) already exists in the current file. Would you like to enter a different name (Y/N)?\n')
-			if change in validAgrees:
-				category = input('Name of category: ')
-				return category
-			else:
+	try:
+		if category in data['categories'].keys():
+			if rePrompt == True:
+				change = input(f'A category matching the name provided ({category}) already exists in the current file. Would you like to enter a different name (Y/N)?\n')
+				if change in validAgrees:
+					category = input('Name of category: ')
+					return category
+				else:
+					return True
+			elif rePrompt == False:
 				return True
-		elif rePrompt == True:
-			return True
-	elif category not in data['categories'].keys():
-		if rePrompt == False:
-			return False
-		elif rePrompt == False:
-			change = input(f'A category matching the name provided ({category}) could not be found in the current file. Would you like to ender a different name(Y/N)?\n')
-			if change in validAgrees:
-				category = input('Name of category: ')
-				return category
+		elif category not in data['categories'].keys():
+			if rePrompt == False:
+				return False
+			elif rePrompt == False:
+				change = input(f'A category matching the name provided ({category}) could not be found in the current file. Would you like to ender a different name(Y/N)?\n')
+				if change in validAgrees:
+					category = input('Name of category: ')
+					return category
+	except Exception as e: # idk what could go wrong witht his one
+		funcErrorOutput('General Exception', e, f'Unknown general exception. args provided:\ndata: {data}\ncategory: {category}\nrePrompt: {rePrompt}')
+		return None
 
-def checkForFile(file:str, path:str): # improve error handling
+def checkForFile(file:str, path:str):
 	'''
 	Checks if a file exists
 
@@ -280,17 +291,43 @@ def getFileCharCount(path): # add error handling
 		with open(path, 'r') as file:
 			content = file.read()
 			return len(content)
-	except Exception as e:
-		pass
+	except PermissionError as pe:
+		funcErrorOutput('Permission Error', pe, f'Unable to access file({file}) due to a permission error.')
+		return None
+	except FileNotFoundError as FNF:
+		funcErrorOutput('File Not Found Error', FNF, f'File ({file}) was unable to be found to read char count.')
+		return None
 
 def asciiPrint(text, style, color, alignment='left', width=50):
 	f = pyfiglet.Figlet(font=style)
 	asciiText = pyfiglet.figlet_format(text, font=style, width=width)
 	print(align.Align(f'[{color}]{asciiText}[/{color}]', align=alignment))
 
-# commands
+def getDirs(getExpenseDir=True):
+	'''
+	Gets the path params that all the functions use (parentDir, expenseFilesDir, etc)
 
-def addExpense(file): # add error handling
+	Args:
+		getExpenseDir (bool): Determines whether to get the expense files directory
+	
+	Returns:
+		True (tuple): (currentFilePath, parentDir, expenseFilesDir)\n
+		False (tuple): (currentFIlePath, parentDir)\n
+	'''
+	try:
+		if getExpenseDir == True:
+			currentFilePath = os.path.abspath(__file__)
+			parentDir = os.path.dirname(currentFilePath)
+			expenseFilesDir = os.path.join(parentDir, 'reports')
+			return (currentFilePath, parentDir, expenseFilesDir)
+		else:
+			currentFilePath = os.path.abspath(__file__)
+			parentDir = os.path.dirname(currentFilePath)
+			return (currentFilePath, parentDir)
+	except Exception as e: # idk what else could happen tbh
+		funcErrorOutput('General exception', e)
+
+def addExpense(file):
 	
 	stuffNotFound = [] # hold list of what wasn't correct so i can use a for loop and look super cool
 
@@ -309,16 +346,23 @@ def addExpense(file): # add error handling
 		expenseVal = float(expenseVal)
 	except ValueError as ve: # add general exception clause
 		funcErrorOutput('ValueError', ve, f'Error during conversion of expenseVal to float, expenseVal: {expenseVal}')
-		print('Aborting command due to error.')
+		console.print('[info]Aborting command due to error.[/info]')
 		return
 
-	dataFromFile = loadFromFile(file)
+	try:
+		dataFromFile = loadFromFile(file)
+	except json.JSONDecodeError as JDE:
+		funcErrorOutput('Json Decode Error', JDE, f'JDE when trying to read data from the provided file ({file})')
 
 	# invalid input error handling when i get around to it
-	
-	dataFromFile['categories'][expenseCat][expenseName] = {'Amount' : expenseVal, 'Date': expenseDate} # throw in try/except and add error handling
-	saveToFile(file, dataFromFile)
-	print('Expense added to file.')
+	try:
+		dataFromFile['categories'][expenseCat][expenseName] = {'Amount' : expenseVal, 'Date': expenseDate} # throw in try/except and add error handling
+		saveToFile(file, dataFromFile)
+		console.print('[text]Expense added to file.[/text]')
+	except PermissionError as pe:
+		funcErrorOutput('Permission Error', pe, 'Permission error when attempting to save expense to file.')
+	except Exception as e:
+		funcErrorOutput('Unexpected Exception', e, f'Unexpected error. File provided: {file}')
 
 def removeExpense(file): # add error handling
 	expenseName = input('Name of expense: ')
@@ -415,6 +459,8 @@ def addCategory(file): # add error handling
 	while timesChecked <= maxRetries:
 		timesChecked+=1
 		out = checkCatPresense(data, category)
+		if out == None:
+			funcWarnOutput('Category was unable to be checked', comments=f'None was returned when attempting to check for "{category}".')
 		if out == True:
 			break
 		elif out == False:
@@ -546,13 +592,13 @@ minSettingsCharCount = 2
 
 settingsTemplate = {
 	'settings': {
-		'reportDir': expenseFilesDir,
+		'reportDir': None,
 		'reportIndent': 2,
 		'encoding': 'utf-8',
 		'styles':{
-			"info": "dim cyan",
-		    "warning": "yellow",
-		    "error": "bold red"
+			'info': 'dim cyan',
+		    'warning': 'yellow',
+		    'error': 'bold red'
 		}
 	}
 }
@@ -573,6 +619,13 @@ def writeSettings(name:str, dir:str, save:bool, settings=None):
 					saveToFile(os.path.join(dir, name), settingsTemplate)
 			except PermissionError as pe:
 				funcErrorOutput('PermissionError', pe, f'Permission error when attempting to create new settings file in path {os.path.join(dir, name)}')
+		# update settings
+		elif settings != None:
+			try:
+				with open(os.path.join(dir, name), 'w', encoding=settingsTemplate['settings']['encoding']) as f:
+					saveToFile(os.path.join(dir,name), settings)
+			except PermissionError as pe:
+				funcErrorOutput('PermissionError', pe, f'Permission error when attempting to update settings file in path {os.path.join(dir, name)}')
 
 def readSettings(name, dir):
 	# add input validation for name and directory
@@ -590,6 +643,9 @@ def readSettings(name, dir):
 					writeSettings(name, dir, False)
 				data = loadFromFile(filePres[1])
 				return data
+			elif getFileCharCount(filePres[1]) == None:
+				funcWarnOutput('File characters could not be counted.', comments='Check for error from getFileCharCount above for more details.')
+				return None
 			data =  loadFromFile(filePres[1])
 			return data
 		except json.decoder.JSONDecodeError as jde:
@@ -617,7 +673,22 @@ def readSettings(name, dir):
 			except PermissionError as pe:
 				funcErrorOutput('PermissionError', pe, f'Permission error when attempting to create new settings file in path {os.path.join(dir, name)}')
 
+def repairSettings(name, dir): # read old settings data that has proper syntax?
+	pass
+
+currentFilePath, parentDir = getDirs(False)
+
 currentSettings = readSettings('settings.json', parentDir)
+
+if currentSettings == None:
+	console.print(f'[error]CRITICAL ERROR: The settings file located in {parentDir} could not be read. See above errors/warnings for more information[/error]')
+
+# check if expensedir in settings:
+if currentSettings['settings']['reportDir'] == None:
+	curFPath, parenDir, expenseDir = getDirs(True)
+	currentSettings['settings']['reportDir'] = expenseDir
+	writeSettings('settings.json', parenDir, False, currentSettings)
+
 
 # menus
 
@@ -654,28 +725,25 @@ runningMainloop = True
 if runningMainloop == True:
 	def main():
 		try:
-			inMainMenu = states['menus']['inMainMenu']
-			currentFile = states['currentFile']
-			global startup
 			
-			if startup == True:
+			if states['startup'] == True:
 				mainMenu()
-			if currentFile != None and inMainMenu == False:
+			if states['currentFile'] != None and states['menus']['inMainMenu'] == False:
 				print()
-				console.print(f'[info]Currently open file: {os.path.basename(currentFile).split('.')[0]}[/info]\n')
+				console.print(f'[info]Currently open file: {os.path.basename(states['currentFile']).split('.')[0]}[/info]\n')
 			chosenOperation = input('>>> ')
-			if inMainMenu == True:
+			if states['menus']['inMainMenu'] == True:
 				for key in mainOpsDict.keys():
 					if chosenOperation.lower() in mainOpsDict[key]['calls']:
 						func = mainOpsDict[key]['function']
 						func()
-				if currentFile != None:
-					inMainMenu = False
-			elif inMainMenu == False:
+				if states['currentFile'] != None:
+					states['menus']['inMainMenu'] = False
+			elif states['menus']['inMainMenu'] == False:
 				for key in commandsDict.keys():
 					if chosenOperation.lower() in commandsDict[key]['calls']:
 						func = commandsDict[key]['function']
-						func(currentFile)
+						func(states['currentFile'])
 		except KeyboardInterrupt:
 			print()
 			mainMenu()
