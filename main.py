@@ -79,7 +79,7 @@ expenseFilesDir = None
 
 validAgrees = ['y', 'yes'] # basic valid agrees, probably could incorporate into settings
 
-validEmptySettings = [None, '']
+validEmptySettings = [None, '', 'None']
 
 maxRetries = 2 # incorporate into settings maybe?
 
@@ -87,7 +87,7 @@ currentSettings = None # here for funtion use
 
 # functions
 
-def checkVersion():
+def checkVersion(): # add error handling for http errors n other stuff
 	response  = requests.get('https://api.github.com/repos/Jitzwaz/Py-Expense/releases/latest')
 
 	data = response.json()
@@ -226,7 +226,7 @@ def loadFromFile(file:str):
 	except json.JSONDecodeError as JDE:
 		funcErrorOutput('Json Decode Error', JDE, 'JSON Decode Error when attempting to load file.')
 
-def checkCatPresense(data:dict, category:str, rePrompt=True): # remove re-prompt and leave it up to the function
+def checkCatPresense(data:dict, category:str, rePrompt=True): # remove re-prompt and leave it up to the function in future update
 	'''
 	Checks the presense of a category from provided JSON data.
 
@@ -286,7 +286,7 @@ def checkForFile(file:str, path:str):
 		funcErrorOutput('General exception', e, 'idk man')
 	return False, file, path
 
-def getFileCharCount(path): # add error handling
+def getFileCharCount(path):
 	try:
 		with open(path, 'r') as file:
 			content = file.read()
@@ -356,7 +356,10 @@ def addExpense(file):
 
 	# invalid input error handling when i get around to it
 	try:
-		dataFromFile['categories'][expenseCat][expenseName] = {'Amount' : expenseVal, 'Date': expenseDate} # throw in try/except and add error handling
+		try:
+			dataFromFile['categories'][expenseCat][expenseName] = {'Amount' : expenseVal, 'Date': expenseDate} # throw in try/except and add error handling
+		except KeyError as ke:
+			funcErrorOutput('Key Error', ke, f'Key error when attempting to add expense to {expenseCat}.')
 		saveToFile(file, dataFromFile)
 		console.print('[text]Expense added to file.[/text]')
 	except PermissionError as pe:
@@ -424,7 +427,7 @@ def removeExpense(file): # add error handling
 					print('Aborting command.')
 					return False
 
-	if checkExpensePresense('remove') == False:
+	if checkExpensePresense('remove') == False: # couldn't find
 		return
 
 	# find and remove expense
@@ -445,6 +448,8 @@ def removeExpense(file): # add error handling
 						dataFromFile['categories'][expenseCat].pop(expenseName)
 						saveToFile(file, dataFromFile)
 						print('Expense removed from file.')
+	except PermissionError as pe:
+		funcErrorOutput('Permission Error', pe, f'Permission error when attempting to save changes to "{file}"')
 	except Exception as e: # add more specific errors
 		funcErrorOutput('General exception', e, 'general fault for trying to delete expense after passing checkExpensePresense')
 
@@ -461,7 +466,7 @@ def addCategory(file): # add error handling
 		out = checkCatPresense(data, category)
 		if out == None:
 			funcWarnOutput('Category was unable to be checked', comments=f'None was returned when attempting to check for "{category}".')
-		if out == True:
+		if out == True: # it exists wooohooo
 			break
 		elif out == False:
 			print('Aborting command')
@@ -546,42 +551,38 @@ def close():
 commandsDict = {
 	'addExpense' : {
 		'calls' : ('addexpense', 'add expense', 'add-expense', 'add_expense', 'ae'),
-		'function' : addExpense
+		'function' : addExpense,
+		'helpMenu' : 'addExpense help!!!111!1!!!!'
 	},
 	'removeExpense' : {
 		'calls' : ('removeexpense', 'remove expense', 'remove-expense', 'remove_expense', 're'),
-		'function' : removeExpense
+		'function' : removeExpense,
+		'helpMenu' : ''
 	},
 	'addCategory' : {
 		'calls' : ('addcategory', 'add category', 'add_category', 'add-category', 'ac'),
-		'function' : addCategory
+		'function' : addCategory,
+		'helpMenu' : ''
 	},
 	'removeCategory' : {
 		'calls' : ('removecategory', 'remove category', 'remove_category', 'remove-category', 'rc'),
-		'function' : removeCategory
+		'function' : removeCategory,
+		'helpMenu' : ''
 	},
 	'openFile' : {
 		'calls' : ('openfile', 'open file', 'open_file', 'open-file', 'of'),
-		'function' : openFile
+		'function' : openFile,
+		'helpMenu' : ''
 	},
 	'closeFile' : {
 		'calls' : ('closefile', 'close file', 'close_file', 'close-file', 'cf'),
-		'function' : closeFile
+		'function' : closeFile,
+		'helpMenu' : ''
 	},
 	'viewAllExpenses' : {
 		'calls' : ('viewallexpenses', 'view all expenses', 'view_all_expenses', 'view-all-expenses', 'vae'),
-		'function' : viewAllExpenses
-	}
-}
-
-mainOpsDict = {
-	'openFile' : {
-		'calls' : ('openfile', 'open file', 'open_file', 'open-file', 'of', '1'),
-		'function' : openFile
-	},
-	'close' : {
-		'calls' : ('exit', '4'),
-		'function' : close
+		'function' : viewAllExpenses,
+		'helpMenu' : ''
 	}
 }
 
@@ -706,16 +707,48 @@ def mainMenu():
 		#print()
 		print('[cyan]1.[/cyan] Open file')
 		print('[cyan]2.[/cyan] Close file')
-		print('[cyan]3.[/cyan] Settings')
-		print('[cyan]4.[/cyan] Help')
-		print('[cyan]5.[/cyan] Exit')
-	except Exception as e:
+		print('[cyan]3.[/cyan] Help')
+		print('[cyan]4.[/cyan] Exit')
+	except Exception as e: # incase some mystical exception breaks in
 		funcErrorOutput('General Exception', e)
 
 def settingsMenu(file): # add later
 	pass
 
+def helpMenu():
+	try:
+		states['menus']['inHelpMenu'] = True
+		print('[text]1. Commands[/text]')
+		print('[text]2. How to change the settings[/text]')
+		print()
+		choice = input('>>> ')
+		if choice.lower() in ['1', 'commands']:
+			for key in commandsDict.keys():
+				console.print(f'[text]{key}[/text]\n')
+		choice2 = input('>>> ')
+		for key in commandsDict.keys():
+			if choice2.lower() in key['calls']:
+				console.print(f'[info]{key}[/info]\n')
+				console.print(f'[text]  Valid calls: {key["calls"]}[/text]\n')
+				console.print(f'[text]  {key["help"]}[/text]')
+	except Exception as e: # idk what could go wrong here tbh
+		funcErrorOutput('General Exception', e)
 
+# main ops stuff, holds menus too
+mainOpsDict = {
+	'openFile' : {
+		'calls' : ('openfile', 'open file', 'open_file', 'open-file', 'of', '1'),
+		'function' : openFile
+	},
+	'close' : {
+		'calls' : ('exit', '4'),
+		'function' : close
+	},
+	'help' : {
+		'calls' : ('help', '3'),
+		'function' : helpMenu
+	}
+}
 
 #viewAllExpenses(os.path.join(expenseFilesDir, 'test.json'))
 
