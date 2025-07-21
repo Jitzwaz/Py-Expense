@@ -17,6 +17,7 @@ from rich.progress import (BarColumn, MofNCompleteColumn, TextColumn, TimeElapse
 import requests
 
 theme = Theme({ # move and read from settings or something
+	'label' : 'cyan',
 	'text': 'white',
     'info': 'cyan',
     'warn': 'yellow',
@@ -35,7 +36,6 @@ customProgressColumns = (
     )
 
 console = Console(theme=theme)
-
 # just for data structure reference
 # template = {
 # 	'categories': {
@@ -466,9 +466,9 @@ def addCategory(file): # add error handling
 		out = checkCatPresense(data, category)
 		if out == None:
 			funcWarnOutput('Category was unable to be checked', comments=f'None was returned when attempting to check for "{category}".')
-		if out == True: # it exists wooohooo
+		if out == False: # it exists wooohooo
 			break
-		elif out == False:
+		elif out == True:
 			print('Aborting command')
 			return
 		else:
@@ -525,6 +525,8 @@ def viewAllExpenses(file):
 				print(printOut)
 			print()
 
+def totalExpenses(file):
+	pass
 
 # Main operations
 
@@ -557,7 +559,7 @@ commandsDict = {
 	'removeExpense' : {
 		'calls' : ('removeexpense', 'remove expense', 'remove-expense', 'remove_expense', 're'),
 		'function' : removeExpense,
-		'helpMenu' : ''
+		'helpMenu' : 'removeExpense help!!!'
 	},
 	'addCategory' : {
 		'calls' : ('addcategory', 'add category', 'add_category', 'add-category', 'ac'),
@@ -697,18 +699,18 @@ def mainMenu():
 	try:
 		states['menus']['inMainMenu'] = True
 		states['startup'] = False
-		asciiPrint('Main menu', 'slant', 'cyan', 'center', 100)
+		asciiPrint('Main menu', 'slant', currentSettings['settings']['styles']['label'], 'center', 100)
 		if states['currentFile'] != None:
 			console.print(f'[info]Currently open file: {os.path.basename(states['currentFile']).split('.')[0]}[/info]\n')
 		
-		print(f'[cyan]Py-Expense v{version} by Jitzwaz[/cyan]')
+		console.print(f'[cyan]Py-Expense v{version} by Jitzwaz[/cyan]')
 		print()
 		#checkVersion()
 		#print()
-		print('[cyan]1.[/cyan] Open file')
-		print('[cyan]2.[/cyan] Close file')
-		print('[cyan]3.[/cyan] Help')
-		print('[cyan]4.[/cyan] Exit')
+		console.print('[label]1.[/label] [text]Open file[/text]')
+		console.print('[label]2.[/label] [text]Close file[/text]')
+		console.print('[label]3.[/label] [text]Help[/text]')
+		console.print('[label]4.[/label] [text]Exit[/text]')
 	except Exception as e: # incase some mystical exception breaks in
 		funcErrorOutput('General Exception', e)
 
@@ -725,12 +727,13 @@ def helpMenu():
 		if choice.lower() in ['1', 'commands']:
 			for key in commandsDict.keys():
 				console.print(f'[text]{key}[/text]\n')
-		choice2 = input('>>> ')
-		for key in commandsDict.keys():
-			if choice2.lower() in key['calls']:
-				console.print(f'[info]{key}[/info]\n')
-				console.print(f'[text]  Valid calls: {key["calls"]}[/text]\n')
-				console.print(f'[text]  {key["help"]}[/text]')
+		while True:
+			choice2 = input('>>> ')
+			for key in commandsDict.keys():
+				if choice2.lower() in commandsDict[key]['calls']:
+					console.print(f'[label]{key}[/label]\n')
+					console.print(f'[text]  Valid calls: {commandsDict[key]["calls"]}[/text]\n')
+					console.print(f'[text]  {commandsDict[key]["helpMenu"]}[/text]')
 	except Exception as e: # idk what could go wrong here tbh
 		funcErrorOutput('General Exception', e)
 
