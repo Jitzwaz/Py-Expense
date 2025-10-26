@@ -4,11 +4,11 @@
     "reportIndent": 2,
     "encoding": "utf-8",
     "styles": {
-      "label" : "cyan",
-	    "text": "green",
-      "info": "dim cyan",
-      "warning": "yellow",
-      "error": "bold red"
+    	"label" : "cyan",
+		"text": "green",
+    	"info": "dim cyan",
+    	"warning": "yellow",
+    	"error": "bold red"
     }
   }
 }

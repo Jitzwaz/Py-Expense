@@ -7,7 +7,6 @@ import traceback
 
 # sweet ass styling stuff
 import pyfiglet
-import rich
 from rich import print, align
 from rich.columns import Columns
 from rich.console import Console
@@ -327,9 +326,13 @@ def getDirs(getExpenseDir=True):
 	except Exception as e: # idk what else could happen tbh
 		funcErrorOutput('General exception', e)
 
+#def checkExpensePresense(expenseName, expenseCat, expenseVal, expenseDate, operation):
+	
+
+
 def addExpense(file):
 	
-	stuffNotFound = [] # hold list of what wasn't correct so i can use a for loop and look super cool
+	stuffNotFound = [] # hold list of what wasn't correct so i can use a for loop later and look super cool
 
 	#args
 	expenseName = input('Name of expense: ')
@@ -354,7 +357,11 @@ def addExpense(file):
 	except json.JSONDecodeError as JDE:
 		funcErrorOutput('Json Decode Error', JDE, f'JDE when trying to read data from the provided file ({file})')
 
-	# invalid input error handling when i get around to it
+	
+	# invalid input handling
+	# input validation
+
+	# actual adding
 	try:
 		try:
 			dataFromFile['categories'][expenseCat][expenseName] = {'Amount' : expenseVal, 'Date': expenseDate} # throw in try/except and add error handling
@@ -554,7 +561,7 @@ commandsDict = {
 	'addExpense' : {
 		'calls' : ('addexpense', 'add expense', 'add-expense', 'add_expense', 'ae'),
 		'function' : addExpense,
-		'helpMenu' : 'addExpense help!!!111!1!!!!'
+		'helpMenu' : 'As the name suggests addExpense adds an expense to the currently open file.\n'
 	},
 	'removeExpense' : {
 		'calls' : ('removeexpense', 'remove expense', 'remove-expense', 'remove_expense', 're'),
@@ -588,7 +595,7 @@ commandsDict = {
 	}
 }
 
-# settings - add editing but loading n stuff is fine probably, run validation tests also add customizeable command calls
+# settings - add editing but loading n stuff is fine probably, run validation tests also add customizeable command calls eventually
 
 settingsName = 'settings.json'
 minSettingsCharCount = 2
