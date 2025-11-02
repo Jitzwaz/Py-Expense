@@ -9,6 +9,7 @@
     	"info": "dim cyan",
     	"warning": "yellow",
     	"error": "bold red"
-    }
+    },
+	"showReportsList": true
   }
 }

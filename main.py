@@ -521,7 +521,11 @@ def removeCategory(file): # add error handling
 def viewAllExpenses(file):
 	data = loadFromFile(file)
 	for cat in data['categories'].keys():
+		totalCost = 0
+		for expense in data['categories'][cat].keys():
+			totalCost+=float(data['categories'][cat][expense]['Amount'])
 		print(f'{cat}:')
+		print(f'total expenses for this category: {totalCost}')
 		for expense in data['categories'][cat].keys():
 			printOut = ''+(' '*expenseIndent)
 			printOut+=f'{expense}:'
@@ -538,6 +542,13 @@ def totalExpenses(file):
 # Main operations
 
 def openFile(): # add input validation and error handling
+	if currentSettings['settings']['showReportsList'] == True:
+		for (root, dirs, files) in os.walk(currentSettings['settings']['reportDir']):
+			print('Files in current directory:\n')
+			for file in files:
+				print(file)
+		print("\n(If you don't want this list shown you can disable it in the settings.)")
+				
 	fileName = input('What expense file would you like to open?\n ')
 	filePres = checkForFile(fileName+'.json', currentSettings['settings']['reportDir'])
 	if filePres[0] == True: # file found
@@ -545,10 +556,13 @@ def openFile(): # add input validation and error handling
 		states['currentFile'] = filePres[1]
 		console.print('[info]File successfully opened.[/info]')
 
-def closeFile(): # add input validation and error handling
+def closeFile(currentFile): # add input validation and error handling
 	choice =  input('Are you sure you want to close the current file (Y/N)? ')
 	if choice in validAgrees:
 		states['currentFile'] = None
+		states['menus']['inMainMenu'] = True
+		mainMenu()
+		
 
 def close():
 	choice = input('Are you sure you want to close the program (Y/N)? ')
@@ -560,41 +574,47 @@ def close():
 commandsDict = {
 	'addExpense' : {
 		'calls' : ('addexpense', 'add expense', 'add-expense', 'add_expense', 'ae'),
+		'helpID' : '',
 		'function' : addExpense,
-		'helpMenu' : 'As the name suggests addExpense adds an expense to the currently open file.\n'
+		'helpMenu' : f'As the name suggests addExpense adds an expense to the currently open file.\n  You will be asked for the name, category, cost, and optional date.\n'
 	},
 	'removeExpense' : {
 		'calls' : ('removeexpense', 'remove expense', 'remove-expense', 'remove_expense', 're'),
+		'helpID' : '',
 		'function' : removeExpense,
-		'helpMenu' : 'removeExpense help!!!'
+		'helpMenu' : 'Just like addExpense removeExpense removes an expense from the currently open file.\n  You will be asked for the name, category, and the cost or date.\n  I recommend searching by the cost unless you have duplicate expenses as duplicates are not currently handled.\n  I will be adding this in the next update.'
 	},
 	'addCategory' : {
 		'calls' : ('addcategory', 'add category', 'add_category', 'add-category', 'ac'),
+		'helpID' : '',
 		'function' : addCategory,
-		'helpMenu' : ''
+		'helpMenu' : 'addCategory will add a category to the currently open file.\n  You will be asked for the name of the category.'
 	},
 	'removeCategory' : {
 		'calls' : ('removecategory', 'remove category', 'remove_category', 'remove-category', 'rc'),
+		'helpID' : '',
 		'function' : removeCategory,
-		'helpMenu' : ''
+		'helpMenu' : 'removeCategory will remove a category from the currently open file.\n  You will be asked for the name of the category you want to remove.'
 	},
 	'openFile' : {
 		'calls' : ('openfile', 'open file', 'open_file', 'open-file', 'of'),
+		'helpID' : '',
 		'function' : openFile,
-		'helpMenu' : ''
+		'helpMenu' : "openFile will open a file based on the name you provide.\n  Unless you have disabled the listing feature which can be done in the settings, a list of all files in the current reports directory will be displatyed.\n  When prompted for the name you don't need to add the .json to the end."
 	},
 	'closeFile' : {
 		'calls' : ('closefile', 'close file', 'close_file', 'close-file', 'cf'),
+		'helpID' : '',
 		'function' : closeFile,
-		'helpMenu' : ''
+		'helpMenu' : 'closeFile will close the currently open file.\n  No inputs will be requested.\n'
 	},
 	'viewAllExpenses' : {
 		'calls' : ('viewallexpenses', 'view all expenses', 'view_all_expenses', 'view-all-expenses', 'vae'),
+		'helpID' : '',
 		'function' : viewAllExpenses,
-		'helpMenu' : ''
+		'helpMenu' : 'viewAllExpenses will display all the espenses and categories in the current file as well as totalling amounts per category.\n  No inputs will be requested.'
 	}
 }
-
 # settings - add editing but loading n stuff is fine probably, run validation tests also add customizeable command calls eventually
 
 settingsName = 'settings.json'
@@ -606,6 +626,8 @@ settingsTemplate = {
 		'reportIndent': 2,
 		'encoding': 'utf-8',
 		'styles':{
+			'label' : "cyan",
+			'text': "green",
 			'info': 'dim cyan',
 		    'warning': 'yellow',
 		    'error': 'bold red'
@@ -732,12 +754,13 @@ def helpMenu():
 		print()
 		choice = input('>>> ')
 		if choice.lower() in ['1', 'commands']:
-			for key in commandsDict.keys():
-				console.print(f'[text]{key}[/text]\n')
+			for i, key in enumerate(commandsDict.keys()):
+				commandsDict[key]['helpID'] = str(i+1)
+				console.print(f'[info]{i+1}.[/info] [text]{key}[/text]\n')
 		while True:
 			choice2 = input('>>> ')
 			for key in commandsDict.keys():
-				if choice2.lower() in commandsDict[key]['calls']:
+				if choice2.lower() in commandsDict[key]['calls'] or choice2 in commandsDict[key]['helpID']:
 					console.print(f'[label]{key}[/label]\n')
 					console.print(f'[text]  Valid calls: {commandsDict[key]["calls"]}[/text]\n')
 					console.print(f'[text]  {commandsDict[key]["helpMenu"]}[/text]')
