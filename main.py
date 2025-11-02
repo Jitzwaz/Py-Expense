@@ -600,7 +600,7 @@ commandsDict = {
 		'calls' : ('openfile', 'open file', 'open_file', 'open-file', 'of'),
 		'helpID' : '',
 		'function' : openFile,
-		'helpMenu' : "openFile will open a file based on the name you provide.\n  Unless you have disabled the listing feature which can be done in the settings, a list of all files in the current reports directory will be displatyed.\n  When prompted for the name you don't need to add the .json to the end."
+		'helpMenu' : "openFile will open a file based on the name you provide.\n  Unless you have disabled the listing feature which can be done in the settings, a list of all files in the current reports directory will be displayed.\n  When prompted for the name you don't need to add the .json to the end."
 	},
 	'closeFile' : {
 		'calls' : ('closefile', 'close file', 'close_file', 'close-file', 'cf'),
